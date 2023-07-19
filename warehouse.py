@@ -777,9 +777,9 @@ if __name__ == '__main__':
         device_dict["ip"] = chunk[4]
         device_dict["port"] = chunk[5]
         # device_dict["videoEncodingInformation"] = chunk[6]
-        device_dict["videoEncodingInformation"] = 'MP4'
+        device_dict["videoEncodingInformation"] = 'H265'
         device_dict["username"] = chunk[7]
-        device_dict["rtsp"] = "/home/agx123/face_recog_test.mp4"
+        device_dict["rtsp"] = "rtsp://admin:admin123@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
         # device_dict["rtsp"] = "/home/agx123/face_recog_test.mp4"
         # device_dict["rtsp"] = dev_list[index]
         device_dict["password"] = chunk[9]

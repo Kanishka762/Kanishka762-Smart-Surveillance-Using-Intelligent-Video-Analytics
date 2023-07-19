@@ -109,11 +109,21 @@ def merge_activity(act_batch_res, output_json):
                 obj["activity"] = None
     return output_json
 
+async def json_publish_activity(primary):
+    nc = await nats.connect(servers=nats_urls , reconnect_time_wait= 50 ,allow_reconnect=True, connect_timeout=20, max_reconnect_attempts=60)
+    js = nc.jetstream()
+    JSONEncoder = json.dumps(primary)
+    json_encoded = JSONEncoder.encode()
+    Subject = "service.notifications"
+    Stream_name = "services"
+    ack = await js.publish(Subject, json_encoded)
+    print(" ")
+    print(f'Ack: stream={ack.stream}, sequence={ack.seq}')
+    print("Activity is getting published")
 
 def process_results(device_id,batch_data,device_data,device_timestamp, datainfo, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
     act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
     output_json = merge_activity(act_batch_res, output_json)
-
 
     if output_json['metaData']['object']:
         # print(output_json)
@@ -140,8 +150,10 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
 
         # for each in output_json['metaData']['object']:
         if len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly])>0 or len([True for each in [each["class"] for each in output_json['metaData']['object']] if each in anamoly_object])>0:
-            alarm()
+            print("alarm trigger for activities",)
+            # alarm()
             print("Anomoly check cnt:",len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly]))
+            
             output_json["type"] = "anomaly"
             output_json_fr = copy.deepcopy(output_json)
             output_json = conv_jsonnumpy_2_jsoncid(output_json)
