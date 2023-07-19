@@ -1,8 +1,13 @@
 import os
-
+from dotenv import load_dotenv
 from db_push import gif_push
+from os.path import join, dirname
 
-gif_path = "./Gif_output"
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+# gif_path = "./Gif_output"
+gif_path = os.getenv("path_gif")
 if os.path.exists(gif_path) is False:
     os.mkdir(gif_path)
 

@@ -26,7 +26,7 @@
 import argparse
 import sys
 sys.path.append('../')
-
+import ast
 import os
 from os.path import join, dirname
 import time
@@ -76,15 +76,19 @@ load_dotenv(dotenv_path)
 device = os.getenv("device")
 tenant_name = os.getenv("tenant_name")
 
+rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
+hls_path = os.getenv("path_hls")
+place = os.getenv("place")
+timezone = pytz.timezone(f'{place}')  #assign timezone
 config_path = path + f"/models_deepstream/{tenant_name}/{device}/config.txt"
 
 age_dict = {}
 
-hls_path = path + "/Hls_output"
+# hls_path = path + "/Hls_output"
 if os.path.exists(hls_path) is False:
     os.mkdir(hls_path)
 
-timezone = pytz.timezone('Asia/Kolkata')   
+# timezone = pytz.timezone('Asia/Kolkata')   
 dev_id_dict = {}
 gif_dict = {}
 detect_data = []
@@ -768,7 +772,7 @@ if __name__ == '__main__':
     device_det = filter_devices()
     # print(device_det)
     dev_details = [""]
-    for chunk in device_det:
+    for i,chunk in enumerate(device_det):
         device_dict = {}
         device_dict["deviceId"] = chunk[0]
         device_dict["tenantId"] = chunk[1]
@@ -779,7 +783,7 @@ if __name__ == '__main__':
         # device_dict["videoEncodingInformation"] = chunk[6]
         device_dict["videoEncodingInformation"] = 'H265'
         device_dict["username"] = chunk[7]
-        device_dict["rtsp"] = "rtsp://admin:admin123@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
+        device_dict["rtsp"] = rtsp_links[i]
         # device_dict["rtsp"] = "/home/agx123/face_recog_test.mp4"
         # device_dict["rtsp"] = dev_list[index]
         device_dict["password"] = chunk[9]
@@ -789,7 +793,8 @@ if __name__ == '__main__':
         # if device_dict["rtsp"].find("rtsp://") != 0:
         #     device_dict["rtsp"] = device_dict["rtsp"]
         dev_details.append(device_dict)
-        break
+        if i == 6:
+            break
     # threading.Thread(target=gst_hls_push,args=(dev_details,)).start()
     main(dev_details)
 
