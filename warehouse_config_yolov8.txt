@@ -1,0 +1,41 @@
+[property]
+gpu-id=0
+net-scale-factor=0.0039215697906911373
+model-color-format=0
+<<<<<<< HEAD
+onnx-file=17_03_2023_yolov8_act.onnx
+#model-engine-file=/home/srihari/DS_Pipeline/yolov8.engine
+#int8-calib-file=/home/srihari/DS_Pipeline/yolov3-calibration.table.trt7.0
+labelfile-path=labels.txt
+batch-size=5
+=======
+onnx-file=/home/srihari/DS_Pipeline/17_03_2023_yolov8_act.onnx
+model-engine-file=/home/srihari/DS_Pipeline/yolov8.engine
+#int8-calib-file=/home/srihari/DS_Pipeline/yolov3-calibration.table.trt7.0
+labelfile-path=/home/srihari/DS_Pipeline/labels.txt
+batch-size=1
+>>>>>>> 2cf0737ba486f27a9bc57aaf0a4fdfbb59389fad
+network-mode=0
+num-detected-classes=7
+interval=0
+gie-unique-id=1
+process-mode=1
+network-type=0
+cluster-mode=2
+maintain-aspect-ratio=1
+symmetric-padding=1
+#force-implicit-batch-dim=1
+#workspace-size=1000
+parse-bbox-func-name=NvDsInferParseYolo
+#parse-bbox-func-name=NvDsInferParseYoloCuda
+<<<<<<< HEAD
+custom-lib-path=/home/agx123/DS_pipeline_new/DeepStream-Yolo/nvdsinfer_custom_impl_Yolo/libnvdsinfer_custom_impl_Yolo.so
+=======
+custom-lib-path=/home/srihari/DS_Pipeline/nvdsinfer_custom_impl_Yolo/libnvdsinfer_custom_impl_Yolo.so
+>>>>>>> 2cf0737ba486f27a9bc57aaf0a4fdfbb59389fad
+engine-create-func-name=NvDsInferYoloCudaEngineGet
+
+[class-attrs-all]
+nms-iou-threshold=0.45
+pre-cluster-threshold=0.25
+topk=300
