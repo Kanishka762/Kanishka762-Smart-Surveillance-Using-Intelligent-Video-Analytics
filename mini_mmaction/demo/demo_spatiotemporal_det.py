@@ -3,6 +3,7 @@ import argparse
 import copy as cp
 import tempfile
 
+import os
 import sys
 sys.path.append('/home/agx123/DS_pipeline_new/mini_mmaction')
 
@@ -25,24 +26,27 @@ try:
 except ImportError:
     raise ImportError('Please install moviepy to enable output file')
 
-args_video = "/home/agx123/DS_pipeline_new/mini_mmaction/demo/demo.mp4"
-args_out_filename = "/home/agx123/DS_pipeline_new/mini_mmaction/demo/demo_spatiotemporal_det.mp4"
+cur_dir=os.getcwd()
+sys.path.append(cur_dir)
+
+print("++++++++++++++++++++")
+print(cur_dir)
+print("++++++++++++++++++++")
+
+args_video = cur_dir + "/demo/demo.mp4"
 args_short_side = 256
-args_config = '/home/agx123/DS_pipeline_new/mini_mmaction/configs/detection/slowfast/slowfast_kinetics400-pretrained-r50_8xb16-4x16x1-20e_ava21-rgb.py'
+args_config = cur_dir + '/mini_mmaction/configs/detection/slowfast/slowfast_kinetics400-pretrained-r50_8xb16-4x16x1-20e_ava21-rgb.py'
 args_cfg_options = {}
 args_predict_stepsize = 8
-args_label_map = "/home/agx123/DS_pipeline_new/mini_mmaction/tools/label_map.txt"
-args_det_config = "/home/agx123/DS_pipeline_new/mini_mmaction/demo/demo_configs/faster-rcnn_r50_fpn_2x_coco_infer.py"
+args_label_map = cur_dir + "/mini_mmaction/tools/label_map.txt"
+args_det_config = cur_dir + "/mini_mmaction/demo/demo_configs/faster-rcnn_r50_fpn_2x_coco_infer.py"
 args_det_checkpoint =  "http://download.openmmlab.com/mmdetection/v2.0/faster_rcnn/faster_rcnn_r50_fpn_2x_coco/faster_rcnn_r50_fpn_2x_coco_bbox_mAP-0.384_20200504_210434-a5d8aa15.pth"
 args_det_score_thr = 0.9
 args_det_cat_id = 0
 args_device =  "cuda:0"
-args_checkpoint = "/home/agx123/DS_pipeline_new/models_deepstream/best_mAP_overall_epoch_12.pth"
-
-# args_checkpoint = "https://download.openmmlab.com/mmaction/detection/ava/slowonly_omnisource_pretrained_r101_8x8x1_20e_ava_rgb/slowonly_omnisource_pretrained_r101_8x8x1_20e_ava_rgb_20201217-16378594.pth"
+args_checkpoint = cur_dir + "/models_deepstream/best_mAP_overall_epoch_12.pth"
 args_action_score_thr = 0.5 
 args_output_stepsize = 4 
-args_out_filename = "/home/agx123/DS_pipeline_new/mini_mmaction/demo/demo_spatiotemporal_det.mp4"
 tmp_dir = tempfile.TemporaryDirectory()
 config = mmengine.Config.fromfile(args_config)
 config.model.backbone.pretrained = None
