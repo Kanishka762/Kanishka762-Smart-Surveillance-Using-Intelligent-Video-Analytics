@@ -5,7 +5,7 @@ import tempfile
 
 import os
 import sys
-sys.path.append('/home/agx123/DS_pipeline_new/mini_mmaction')
+# sys.path.append('/home/agx123/DS_pipeline_new/mini_mmaction')
 
 import cv2
 import mmcv
@@ -29,9 +29,6 @@ except ImportError:
 cur_dir=os.getcwd()
 sys.path.append(cur_dir)
 
-print("++++++++++++++++++++")
-print(cur_dir)
-print("++++++++++++++++++++")
 
 args_video = cur_dir + "/demo/demo.mp4"
 args_short_side = 256
