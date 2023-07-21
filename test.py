@@ -23,15 +23,12 @@
 # DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-
 import argparse
 import sys
 sys.path.append('../')
-
-
+import ast
 import os
 from os.path import join, dirname
-
 import time
 import threading
 import random
@@ -39,7 +36,6 @@ import string
 import gi
 import configparser
 gi.require_version('Gst', '1.0')
-
 from gi.repository import GObject, Gst
 from gi.repository import GLib
 from ctypes import *
@@ -48,15 +44,28 @@ import math
 import platform
 from common.is_aarch_64 import is_aarch64
 from common.bus_call import bus_call
+from datetime import datetime
+import datetime
+import shutil
+
+# from common.FPS import GETFPS
+# from sparkplug_b import *
 import pyds
 import pytz
 import datetime
 import numpy as np
 import cv2
+import asyncio
 
-timezone = pytz.timezone('Asia/Kolkata')   #assign timezone
-
+# from json_structure import frame_2_dict
 from dotenv import load_dotenv
+# from gif_creation import gif_build
+# from db_fetch_members import fetch_db_mem
+# from db_push import gif_push, gst_hls_push
+# from facedatainsert_lmdb import add_member_to_lmdb
+# from lmdb_list_gen import attendance_lmdb_known, attendance_lmdb_unknown
+# from generate_crop import save_one_box
+
 
 path = os.getcwd()
 
@@ -66,36 +75,121 @@ load_dotenv(dotenv_path)
 device = os.getenv("device")
 tenant_name = os.getenv("tenant_name")
 
+# rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
+hls_path = os.getenv("path_hls")
+place = os.getenv("place")
+timezone = pytz.timezone(f'{place}')  #assign timezone
 config_path = path + f"/models_deepstream/{tenant_name}/{device}/config.txt"
 
+age_dict = {}
 
+# hls_path = path + "/Hls_output"
+if os.path.exists(hls_path) is False:
+    os.mkdir(hls_path)
+
+# timezone = pytz.timezone('Asia/Kolkata')   
+dev_id_dict = {}
+gif_dict = {}
 detect_data = []
-MAX_DISPLAY_LEN=64
-
-PGIE_CLASS_ID_PERSON = 0
-PGIE_CLASS_ID_VEHICLE = 1
-PGIE_CLASS_ID_ELEPHANT = 2
+# MAX_DISPLAY_LEN=64
+PGIE_CLASS_ID_MALE = 0
+PGIE_CLASS_ID_FEMALE = 1
+PGIE_CLASS_ID_FIRE = 2
+PGIE_CLASS_ID_SMOKE = 3
+PGIE_CLASS_ID_GUN = 4
+PGIE_CLASS_ID_KNIFE = 5
 past_tracking_meta=[0]
-
-MUXER_OUTPUT_WIDTH=1920
-MUXER_OUTPUT_HEIGHT=1080
-MUXER_BATCH_TIMEOUT_USEC=4000000
-TILED_OUTPUT_WIDTH=1280
-TILED_OUTPUT_HEIGHT=720
-GST_CAPS_FEATURES_NVMM="memory:NVMM"
+# MUXER_OUTPUT_WIDTH=1920
+# MUXER_OUTPUT_HEIGHT=1080
+# MUXER_BATCH_TIMEOUT_USEC=4000000
+# TILED_OUTPUT_WIDTH=1280
+# TILED_OUTPUT_HEIGHT=720
+# GST_CAPS_FEATURES_NVMM="memory:NVMM"
 OSD_PROCESS_MODE= 0
 OSD_DISPLAY_TEXT= 1
-pgie_classes_str= [ "Person", "Vehicle","Elephant"]
+pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
+ 
+# def load_lmdb_list():
+#     known_whitelist_faces1, known_whitelist_id1 = attendance_lmdb_known()
+#     known_blacklist_faces1, known_blacklist_id1 = attendance_lmdb_unknown()
     
+#     global known_whitelist_faces
+#     known_whitelist_faces = known_whitelist_faces1
+
+#     global known_whitelist_id
+#     known_whitelist_id = known_whitelist_id1
+    
+#     global known_blacklist_faces
+#     known_blacklist_faces = known_blacklist_faces1
+
+#     global known_blacklist_id
+#     known_blacklist_id = known_blacklist_id1
+
+# def load_lmdb_fst(mem_data):
+#     i = 0
+#     for each in mem_data:
+#         i = i+1
+#         add_member_to_lmdb(each)
+#         print("inserting ",each)
+
+def draw_bounding_boxes(image, obj_meta, confidence):
+    confidence = '{0:.2f}'.format(confidence)
+    rect_params = obj_meta.rect_params
+    top = int(rect_params.top)
+    left = int(rect_params.left)
+    width = int(rect_params.width)
+    height = int(rect_params.height)
+    obj_name = pgie_classes_str[obj_meta.class_id]
+    # image = cv2.rectangle(image, (left, top), (left + width, top + height), (0, 0, 255, 0), 2, cv2.LINE_4)
+    color = (0, 0, 255, 0)
+    w_percents = int(width * 0.05) if width > 100 else int(width * 0.1)
+    h_percents = int(height * 0.05) if height > 100 else int(height * 0.1)
+    linetop_c1 = (left + w_percents, top)
+    linetop_c2 = (left + width - w_percents, top)
+    image = cv2.line(image, linetop_c1, linetop_c2, color, 6)
+    linebot_c1 = (left + w_percents, top + height)
+    linebot_c2 = (left + width - w_percents, top + height)
+    image = cv2.line(image, linebot_c1, linebot_c2, color, 6)
+    lineleft_c1 = (left, top + h_percents)
+    lineleft_c2 = (left, top + height - h_percents)
+    image = cv2.line(image, lineleft_c1, lineleft_c2, color, 6)
+    lineright_c1 = (left + width, top + h_percents)
+    lineright_c2 = (left + width, top + height - h_percents)
+    image = cv2.line(image, lineright_c1, lineright_c2, color, 6)
+    # Note that on some systems cv2.putText erroneously draws horizontal lines across the image
+    image = cv2.putText(image, obj_name + ',C=' + str(confidence), (left - 10, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (0, 0, 255, 0), 2)
+    return image
+
+# def crop_object(image, obj_meta):
+#     rect_params = obj_meta.rect_params
+#     top = int(rect_params.top)
+#     left = int(rect_params.left)
+#     width = int(rect_params.width)
+#     height = int(rect_params.height)
+#     obj_name = pgie_classes_str[obj_meta.class_id]
+#     x1 = left
+#     y1 = top
+#     x2 = left + width
+#     y2 = top + height
+#     crop_img=save_one_box([x1,y1,x2,y2],image)
+    crop=cv2.cvtColor(crop_img,cv2.COLOR_BGR2RGB)
+    # crop_img = image[top:top+height, left:left+width]
+    return crop
 
 def tracker_src_pad_buffer_probe(pad,info,u_data):
+    global gif_dict
+
     frame_number=0
     #Intiallizing object counter with 0.
     obj_counter = {
-        PGIE_CLASS_ID_VEHICLE:0,
-        PGIE_CLASS_ID_PERSON:0,
-        PGIE_CLASS_ID_ELEPHANT:0
-      
+        PGIE_CLASS_ID_MALE : 0,
+        PGIE_CLASS_ID_FEMALE : 0,
+        PGIE_CLASS_ID_FIRE : 0,
+        PGIE_CLASS_ID_SMOKE : 0,
+        PGIE_CLASS_ID_GUN : 0,
+        PGIE_CLASS_ID_KNIFE : 0
+
     }
     num_rects=0
     gst_buffer = info.get_buffer()
@@ -112,7 +206,6 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
     l_frame = batch_meta.frame_meta_list
     while l_frame is not None:
         try:
-            
             # Note that l_frame.data needs a cast to pyds.NvDsFrameMeta
             # The casting is done by pyds.NvDsFrameMeta.cast()
             # The casting also keeps ownership of the underlying memory
@@ -120,32 +213,42 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
             # it alone.
             frame_meta = pyds.NvDsFrameMeta.cast(l_frame.data) #new frame
             n_frame = pyds.get_nvds_buf_surface(hash(gst_buffer), frame_meta.batch_id)
+            n_frame = cv2.cvtColor(n_frame, cv2.COLOR_BGR2RGB)
             dt = datetime.datetime.now(timezone)
-        
             
         except StopIteration:
             break
         
-        
         frame_number = frame_meta.frame_num
         frame_copy = np.array(n_frame, copy = True, order = 'C')
         frame_copy = cv2.cvtColor(frame_copy, cv2.COLOR_RGBA2RGB)
+        
+        n_frame_copy = cv2.cvtColor(n_frame, cv2.COLOR_RGBA2RGB)
         # cv2.imwrite(f'{frame_number}.jpg',frame_copy)
         
         camera_id = frame_meta.pad_index
         source_Id = frame_meta.source_id
-
+        
+        for key, value in dev_id_dict.items():
+            device_id = value['deviceId']
+            if device_id not in gif_dict:
+                gif_dict[device_id] = []
+                
+        # asyncio.run(gif_build(n_frame_copy, dev_id_dict[camera_id], gif_dict))
         
         num_detect = frame_meta.num_obj_meta
+        device_timestamp = datetime.datetime.now(timezone)
         frame_dict = {
         'frame_number': frame_number ,
         'total_detect' : num_detect,
-        'source_id' : source_Id,
         'camera_id' : camera_id,
-        'np_arr' : frame_copy,
+        'frame_timestamp' : device_timestamp,
         'objects': []  # List to hold object dictionaries
     }
         l_obj=frame_meta.obj_meta_list
+        # print(frame_meta)
+        # print(dev_id_dict[camera_id])
+        n_frame_bbox = None
         while l_obj is not None:
             try:
                 # Casting l_obj.data to pyds.NvDsObjectMeta
@@ -157,32 +260,58 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
                 detect_type = obj_meta.obj_label
                 
                 bbox = obj_meta.tracker_bbox_info 
+                
                 rect_params = obj_meta.rect_params
                 left = rect_params.left
                 top = rect_params.top
                 width = rect_params.width
                 height = rect_params.height
                 
-                obj_id  =  obj_meta.object_id
+                n_frame_bbox = None
+                n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence)
+                # cv2.imwrite(f"/home/agx123/DS_pipeline_new/frame_bbox/{frame_number}.jpg",n_frame_bbox)
+                # # convert python array into numpy array format in the copy mode.
+                # frame_bbox = np.array(n_frame_bbox, copy=True, order='C')
+                # # convert the array into cv2 default color format
+                # frame_bbox = cv2.cvtColor(frame_bbox, cv2.COLOR_RGBA2BGRA)
+                
+                # n_frame_crop = crop_object(n_frame, obj_meta)
+                # # convert python array into numpy array format in the copy mode.
+                # frame_crop_copy = np.array(n_frame_crop, copy=True, order='C')
+                # # convert the array into cv2 default color format
+                # frame_crop_copy = cv2.cvtColor(n_frame_crop, cv2.COLOR_RGBA2BGRA)
+                # cv2.imwrite(f"/home/agx123/DS_pipeline_new/frame_crops/{frame_number}.jpg",frame_crop_copy)
+                
+                obj_id  =  int(obj_meta.object_id)
+                if obj_id not in age_dict:
+                    age_dict[obj_id] = []
+                    age_dict[obj_id].append(frame_number)
+                else:
+                    if frame_number not in age_dict[obj_id] :
+                        age_dict[obj_id].append(frame_number)
+
                 obj_dict =  {
                 'detect_type' : detect_type,
                 'confidence_score': confidence_score,
                 'obj_id' : obj_id,
                 'bbox_left' : left,
                 'bbox_top' : top,
-                'bbox_right' : width,
-                'bbox_bottom' : height,
-                'timestamp' :  dt.strftime("%H:%M:%S %d/%m/%Y")
-
+                'bbox_right' : left + width,
+                'bbox_bottom' : top + height,
+                'timestamp' :  dt.strftime("%H:%M:%S %d/%m/%Y"),
+                # 'crop' : cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB),
+                'age' : len(age_dict[obj_id])
+                # 'dirs' : x,
+                # 'tracker' : y
                 }
                 frame_dict['objects'].append(obj_dict)
-                detect_data.append(frame_dict)
+                
             except StopIteration:
                 break
             obj_counter[obj_meta.class_id] += 1
             
             try: 
-                l_obj=l_obj.next  #one object iteration ends here
+                l_obj=l_obj.next
             except StopIteration:
                 break
 
@@ -197,7 +326,8 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
         # memory will not be claimed by the garbage collector.
         # Reading the display_text field here will return the C address of the
         # allocated string. Use pyds.get_string() to get the string content.
-        py_nvosd_text_params.display_text = "Frame Number={} Number of Objects={} Vehicle_count={} Person_count={}".format(frame_number, num_rects, obj_counter[PGIE_CLASS_ID_VEHICLE], obj_counter[PGIE_CLASS_ID_PERSON])
+        py_nvosd_text_params.display_text = "Frame Number={} Number of Male={} Female={} Knife ={} Gun={}".format(frame_number, obj_counter[PGIE_CLASS_ID_MALE], obj_counter[PGIE_CLASS_ID_FEMALE], obj_counter[PGIE_CLASS_ID_KNIFE], obj_counter[PGIE_CLASS_ID_GUN])
+
 
         # Now set the offsets where the string should appear
         py_nvosd_text_params.x_offset = 10
@@ -217,8 +347,22 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
         # print(pyds.get_string(py_nvosd_text_params.display_text))
         pyds.nvds_add_display_meta_to_frame(frame_meta, display_meta)
         try:
-            l_frame=l_frame.next           #one frame iteration ends here 
+            l_frame=l_frame.next
+            detect_data.append(frame_dict)   #optional line detect_data is not used any where just holding all frame_dicts
+            if n_frame_bbox is not None:
+                cv2.imwrite("test1.jpg",n_frame_bbox)
+                frame_dict['np_arr'] = n_frame_bbox   
+                frame_dict['org_frame'] = n_frame
+            else:
+                cv2.imwrite("test1.jpg",frame_copy)
+
+                frame_dict['np_arr'] = frame_copy
+                frame_dict['org_frame'] = n_frame
+
+            # datainfo = [known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id]       
+            datainfo = [[],[],[],[]]
             print(frame_dict)
+            # frame_2_dict(frame_dict,dev_id_dict,datainfo)
         except StopIteration:
             break
     return Gst.PadProbeReturn.OK	
@@ -282,8 +426,10 @@ def create_source_bin(index,uri):
         # use nvurisrcbin to enable file-loop
     uri_decode_bin=Gst.ElementFactory.make("nvurisrcbin", "uri-decode-bin")
     uri_decode_bin.set_property("rtsp-reconnect-interval", 50)
+    # uri_decode_bin.set_property("file-loop", True)
     # uri_decode_bin.set_property("file-loop", "true")
-    uri_decode_bin.set_property("cudadec-memtype", 0)
+    mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
+    # uri_decode_bin.set_property("cudadec-memtype", mem_type)
     # else:
     #     uri_decode_bin=Gst.ElementFactory.make("uridecodebin", "uri-decode-bin")
     # if not uri_decode_bin:
@@ -310,6 +456,8 @@ def create_source_bin(index,uri):
  ######################################################################
 
 def main(args):
+    print(args)
+    global dev_id_dict
     # Check input arguments
     past_tracking_meta[0]=1
     if len(args) < 2:
@@ -343,9 +491,19 @@ def main(args):
     pipeline.add(streammux)
     for i in range(number_sources):
         print("Creating source_bin ",i," \n ")
-        uri_name=args[i+1]
+        uri_name = args[i+1]['rtsp']
+        # print("+++++++++++++++")
+        # print(uri_name)
+        # print("+++++++++++++++")
+
+        # dev_id = args[i+1]['deviceId']
+        dev_id_dict[i] = args[i+1]
+        print(dev_id_dict)
+
         if uri_name.find("rtsp://") == 0 :
             is_live = True
+        else:
+            uri_name = "file://"+uri_name
         source_bin=create_source_bin(i, uri_name)
         if not source_bin:
             sys.stderr.write("Unable to create source bin \n")
@@ -358,16 +516,17 @@ def main(args):
         if not srcpad:
             sys.stderr.write("Unable to create src pad bin \n")
         srcpad.link(sinkpad)
-    queue1=Gst.ElementFactory.make("queue","queue1")
-    queue2=Gst.ElementFactory.make("queue","queue2")
-    queue3=Gst.ElementFactory.make("queue","queue3")
-    queue4=Gst.ElementFactory.make("queue","queue4")
-    queue5=Gst.ElementFactory.make("queue","queue5")
-    pipeline.add(queue1)
-    pipeline.add(queue2)
-    pipeline.add(queue3)
-    pipeline.add(queue4)
-    pipeline.add(queue5)
+
+    print(dev_id_dict)
+    print("creating nvvideoconvert")
+    nvvidconv = Gst.ElementFactory.make("nvvideoconvert","nvvidconv")
+    if not nvvidconv:
+        sys.stderr.write(" Unable to create nvvideoconvert \n")
+
+    print("Creating demuxer \n ")
+    demux=Gst.ElementFactory.make("nvstreamdemux", "demuxer")
+    if not demux:
+        sys.stderr.write(" Unable to create demuxer \n")
 
     print("Creating Pgie \n ")
     pgie = Gst.ElementFactory.make("nvinfer", "primary-inference")
@@ -377,38 +536,6 @@ def main(args):
     tracker = Gst.ElementFactory.make("nvtracker", "tracker")
     if not tracker:
         sys.stderr.write(" Unable to create tracker \n")
-
-    print("Creating tiler \n ")
-    tiler=Gst.ElementFactory.make("nvmultistreamtiler", "nvtiler")
-    if not tiler:
-        sys.stderr.write(" Unable to create tiler \n")
-
-    print("Creating nvvidconv \n ")
-    nvvidconv = Gst.ElementFactory.make("nvvideoconvert", "convertor")  
-    if not nvvidconv:
-        sys.stderr.write(" Unable to create nvvidconv \n")
-
-    nvvidconv1 = Gst.ElementFactory.make("nvvideoconvert", "convertor1")  
-    if not nvvidconv:
-        sys.stderr.write(" Unable to create nvvidconv \n")
-    print("Creating nvosd \n ")
-    nvosd = Gst.ElementFactory.make("nvdsosd", "onscreendisplay")
-           ###########################################
-    if not nvosd:
-        sys.stderr.write(" Unable to create nvosd \n")
-    nvosd.set_property('process-mode',OSD_PROCESS_MODE)
-    nvosd.set_property('display-text',OSD_DISPLAY_TEXT)
-    #if(is_aarch64()):
-        #print("Creating transform \n ")
-        #transform=Gst.ElementFactory.make("nvegltransform", "nvegl-transform")
-        #if not transform:
-            #sys.stderr.write(" Unable to create transform \n")
-
-    
-    nvvidconv_postosd = Gst.ElementFactory.make("nvvideoconvert", "convertor_postosd")
-    if not nvvidconv_postosd:
-        sys.stderr.write(" Unable to create nvvidconv_postosd \n")
-        
     
     print("Creating capsfilter \n")
 
@@ -419,36 +546,6 @@ def main(args):
     caps0 = Gst.Caps.from_string("video/x-raw(memory:NVMM), format=RGBA")
     capsfilter0.set_property("caps", caps0)
 
-    capsfilter = Gst.ElementFactory.make("capsfilter", "capsfilter")
-    if not capsfilter:
-        sys.stderr.write(" Unable to create capsfilter \n")
-
-    caps = Gst.Caps.from_string("video/x-raw, width=1280, height=720")
-    capsfilter.set_property("caps", caps)
-
-    print("Creating Encoder \n")
-    encoder = Gst.ElementFactory.make("x264enc", "encoder")
-    if not encoder:
-        sys.stderr.write(" Unable to create encoder \n")
-
-    encoder.set_property("bitrate", 1800000)
-    encoder.set_property("speed-preset", "veryfast")
-
-    print("Creating Code Parser \n")
-    codeparser = Gst.ElementFactory.make("mpeg4videoparse", "mpeg4-parser")
-    if not codeparser:
-        sys.stderr.write(" Unable to create code parser \n")
-
-    print("Creating Container \n")
-    container = Gst.ElementFactory.make("mpegtsmux", "mux")
-    if not container:
-        sys.stderr.write(" Unable to create code parser \n")
-
-    # Make the UDP sink
-    # updsink_port_num = 5400
-    sink = Gst.ElementFactory.make("fakesink", "udpsink")
-    if not sink:
-        sys.stderr.write(" Unable to create hlssink")
 
     config = configparser.ConfigParser()
     config.read('dstest2_tracker_config.txt')
@@ -476,62 +573,42 @@ def main(args):
         if key == 'enable-past-frame' :
             tracker_enable_past_frame = config.getint('tracker', key)
             tracker.set_property('enable_past_frame', tracker_enable_past_frame)
-
-    # sink.set_property('playlist-root', f'https://hls.ckdr.co.in/live-ii/123asd') # Location of the playlist to write
-    # sink.set_property('playlist-location', '/home/srihari/utkarsh/modelservice/Hls_output/123asd/low_bitrate.m3u8') # Location of the playlist to write
-    # sink.set_property('location', '/home/srihari/utkarsh/modelservice/Hls_output/123asd/low_bitrate_segment.%01d.ts') # Location of the file to write
-    # sink.set_property('target-duration', 3) # The target duration in seconds of a segment/file. (0 - disabled, useful for management of segment duration by the streaming server)
-    # sink.set_property('playlist-length', 2) # Length of HLS playlist. To allow players to conform to section 6.3.3 of the HLS specification, this should be at least 3. If set to 0, the playlist will be infinite.
-    # sink.set_property('max-files', 6) 
-    
-    # sink.set_property('host', '224.224.255.255')
-    # sink.set_property('port', updsink_port_num)
-    # sink.set_property('async', False)
-    # sink.set_property('sync', 0)
     
     streammux.set_property('gpu-id', 0)
     streammux.set_property('enable-padding', 0)
     # streammux.set_property('nvbuf-memory-type', 0)
     streammux.set_property('width', 640)
     streammux.set_property('height', 480)
-    streammux.set_property('batch-size', 16)
+    streammux.set_property('batch-size', 5)
     streammux.set_property('batched-push-timeout', 40000)
-    # streammux.set_property('color', 'RGBA')
     pgie.set_property('config-file-path', config_path)
-    #pgie_batch_size=pgie.get_property("batch-size")
-    #if(pgie_batch_size != number_sources):
-        #print("WARNING: Overriding infer-config batch-size",pgie_batch_size," with number of sources ", number_sources," \n")
-    # pgie.set_property("batch-size", 2)
+    pgie_batch_size=pgie.get_property("batch-size")
+    if(pgie_batch_size != number_sources):
+        print("WARNING: Overriding infer-config batch-size",pgie_batch_size," with number of sources ", number_sources," \n")
+    pgie.set_property("batch-size", number_sources)
     
-  
 
-    tiler_rows=int(math.sqrt(number_sources))
-    tiler_columns=int(math.ceil((1.0*number_sources)/tiler_rows))
-    tiler.set_property("rows",tiler_rows)
-    tiler.set_property("columns",tiler_columns)
-    tiler.set_property("width", TILED_OUTPUT_WIDTH)
-    tiler.set_property("height", TILED_OUTPUT_HEIGHT)
+    # tiler_rows=int(math.sqrt(number_sources))
+    # tiler_columns=int(math.ceil((1.0*number_sources)/tiler_rows))
+    # tiler.set_property("rows",tiler_rows)
+    # tiler.set_property("columns",tiler_columns)
+    # tiler.set_property("width", TILED_OUTPUT_WIDTH)
+    # tiler.set_property("height", TILED_OUTPUT_HEIGHT)
 
-    # mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
-    # streammux.set_property("nvbuf-memory-type", mem_type)
-    # nvvidconv.set_property("nvbuf-memory-type", mem_type)
-    # nvvidconv1.set_property("nvbuf-memory-type", mem_type)
-    # tiler.set_property("nvbuf-memory-type", mem_type)
-    # # sink.set_property("qos",0)
+    if not is_aarch64():
+        mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
+        streammux.set_property("nvbuf-memory-type", mem_type)
+        nvvidconv.set_property("nvbuf-memory-type", mem_type)
+        # nvvidconv1.set_property("nvbuf-memory-type", mem_type)
+        # tiler.set_property("nvbuf-memory-type", mem_type)
+     
 
     print("Adding elements to Pipeline \n")
     pipeline.add(pgie)
     pipeline.add(tracker)
-    pipeline.add(tiler)
     pipeline.add(nvvidconv)
-    pipeline.add(nvosd)
-    pipeline.add(nvvidconv_postosd)
-    pipeline.add(capsfilter)
     pipeline.add(capsfilter0)
-    pipeline.add(encoder)
-    pipeline.add(nvvidconv1)
-    pipeline.add(container)
-    pipeline.add(sink)
+    pipeline.add(demux)
     
 
     print("Linking elements in the Pipeline \n")
@@ -539,15 +616,108 @@ def main(args):
     nvvidconv.link(capsfilter0)
     capsfilter0.link(pgie)
     pgie.link(tracker)
-    tracker.link(tiler)
-    tiler.link(nvvidconv1)
-    nvvidconv1.link(nvosd)
-    nvosd.link(queue5)   
-    queue5.link(nvvidconv_postosd)
-    nvvidconv_postosd.link(capsfilter)
-    capsfilter.link(encoder)
-    encoder.link(container)
-    container.link(sink)
+    tracker.link(demux)
+    
+
+    for i in range(number_sources):
+        print("Creating sink ",i," \n ")
+
+        DDNS = args[i+1]['ddns']
+        if DDNS is None or " ":
+            DDNS = "streams.ckdr.co.in:82"
+
+        video_info = hls_path + '/' + dev_id_dict[i]['deviceId']
+        if not os.path.exists(video_info):
+            os.makedirs(video_info, exist_ok=True)
+        
+        sink = Gst.ElementFactory.make("hlssink", f"sink_{i}")
+        pipeline.add(sink)
+        devid = dev_id_dict[i]['deviceId']
+        sink.set_property('playlist-root', f'http://{DDNS}/live/{devid}') # Location of the playlist to write
+        
+        sink.set_property('playlist-location', f'{video_info}/{devid}.m3u8') # Location where .m3u8 playlist file will be stored
+        sink.set_property('location',  f'{video_info}/segment.%01d.ts')  # Location whee .ts segmentrs will be stored
+        sink.set_property('target-duration', 3) # The target duration in seconds of a segment/file. (0 - disabled, useful
+        sink.set_property('playlist-length', 2) # Length of HLS playlist. To allow players to conform to section 6.3.3 of the HLS specification, this should be at least 3. If set to 0, the playlist will be infinite.
+        sink.set_property('max-files', 6) # Maximum number of files to keep on disk. Once the maximum is reached,old files start to be deleted to make room for new ones.
+        
+        # creating queue
+        queue_0 = Gst.ElementFactory.make("queue", f"queue_1_{i}")
+        pipeline.add(queue_0)
+
+        queue_1 = Gst.ElementFactory.make("queue", f"queue_2_{i}")
+        pipeline.add(queue_1)
+        queue_2 = Gst.ElementFactory.make("queue", f"queue_3_{i}")
+        pipeline.add(queue_2)
+        queue_3 = Gst.ElementFactory.make("queue", f"queue_4_{i}")
+        pipeline.add(queue_3)
+        queue_4 = Gst.ElementFactory.make("queue", f"queue_5_{i}")
+        pipeline.add(queue_4)
+        queue_5 = Gst.ElementFactory.make("queue", f"queue_6_{i}")
+        pipeline.add(queue_5)
+
+        parser = Gst.ElementFactory.make("h264parse", f"parse_{i}")
+        pipeline.add(parser)
+
+
+        # creating nvvidconv
+        nvvideoconvert = Gst.ElementFactory.make("nvvideoconvert", f"nvc_{i}")
+        pipeline.add(nvvideoconvert)
+        
+        capsfilter_osd = Gst.ElementFactory.make("capsfilter", f"caps_osd_{i}")
+        pipeline.add(capsfilter_osd)
+        caps_osd = Gst.Caps.from_string("video/x-raw(memory:NVMM), format=RGBA, width=1280, height=720")
+        capsfilter_osd.set_property("caps", caps_osd)
+        
+        # creating nvosd
+        nvdsosd = Gst.ElementFactory.make("nvdsosd", f"osd_{i}")
+        pipeline.add(nvdsosd)
+        nvdsosd.set_property("process-mode", OSD_PROCESS_MODE)
+        nvdsosd.set_property("display-text", OSD_DISPLAY_TEXT)
+        nvvidconv_postosd = Gst.ElementFactory.make("nvvideoconvert", f"nv_post_ods{i}")
+        pipeline.add(nvvidconv_postosd)
+
+        capsfilter = Gst.ElementFactory.make("capsfilter", f"caps_{i}")
+        pipeline.add(capsfilter)
+        caps = Gst.Caps.from_string("video/x-raw(memory:NVMM), width=1280, height=720")
+        capsfilter.set_property("caps", caps)
+        
+        
+        encoder = Gst.ElementFactory.make("nvv4l2h264enc", f"encoder_{i}") # nvv4l2h264enc
+        pipeline.add(encoder)
+        encoder.set_property("bitrate", 180000)
+        if is_aarch64():
+            encoder.set_property("preset-level", "FastPreset")
+        container = Gst.ElementFactory.make("mpegtsmux", f"mux_{i}")
+        pipeline.add(container)
+        if not is_aarch64():
+            mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
+            nvvideoconvert.set_property("nvbuf-memory-type", mem_type)
+            nvvidconv_postosd.set_property("nvbuf-memory-type", mem_type)
+        # connect nvstreamdemux -> queue
+        padname = "src_%u" %i
+        demuxsrcpad = demux.get_request_pad(padname)
+        if not demuxsrcpad:
+            sys.stderr.write("Unable to create demux src pad \n")
+        queuesinkpad = queue_0.get_static_pad("sink")
+        if not queuesinkpad:
+            sys.stderr.write("Unable to create queue sink pad \n")
+        demuxsrcpad.link(queuesinkpad)
+        
+        queue_0.link(nvvideoconvert)
+        nvvideoconvert.link(capsfilter_osd)
+        capsfilter_osd.link(nvdsosd)
+        nvdsosd.link(queue_1)
+        queue_1.link(nvvidconv_postosd)
+        nvvidconv_postosd.link(queue_2)
+        queue_2.link(capsfilter)
+        capsfilter.link(queue_3)
+        queue_3.link(encoder)
+        encoder.link(parser)
+        parser.link(queue_4)
+        queue_4.link(container)
+        container.link(queue_5)
+        queue_5.link(sink)
 
 
     # create an event loop and feed gstreamer bus mesages to it
@@ -556,7 +726,7 @@ def main(args):
     bus.add_signal_watch()
     bus.connect ("message", bus_call, loop)
 
-
+    
     tracker_src_pad=tracker.get_static_pad("src")
     if not tracker_src_pad:
         sys.stderr.write(" Unable to get src pad \n")
@@ -581,8 +751,5 @@ def main(args):
         
     print("Exiting app\n")
     pipeline.set_state(Gst.State.NULL)
-
-if __name__ == '__main__':
-    sys.exit(main(sys.argv))
 
 
