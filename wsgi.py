@@ -53,7 +53,7 @@ if __name__ == '__main__':
         # if device_dict["rtsp"].find("rtsp://") != 0:
         #     device_dict["rtsp"] = device_dict["rtsp"]
         dev_details.append(device_dict)
-        if i == 2:
+        if i == 1:
             break
     # threading.Thread(target=gst_hls_push,args=(dev_details,)).start()
     main(dev_details)

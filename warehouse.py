@@ -428,7 +428,8 @@ def create_source_bin(index,uri):
     uri_decode_bin.set_property("rtsp-reconnect-interval", 50)
     # uri_decode_bin.set_property("file-loop", True)
     # uri_decode_bin.set_property("file-loop", "true")
-    # uri_decode_bin.set_property("cudadec-memtype", 0)
+    mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
+    # uri_decode_bin.set_property("cudadec-memtype", mem_type)
     # else:
     #     uri_decode_bin=Gst.ElementFactory.make("uridecodebin", "uri-decode-bin")
     # if not uri_decode_bin:
@@ -598,8 +599,8 @@ def main(args):
         mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
         streammux.set_property("nvbuf-memory-type", mem_type)
         nvvidconv.set_property("nvbuf-memory-type", mem_type)
-        nvvidconv1.set_property("nvbuf-memory-type", mem_type)
-        tiler.set_property("nvbuf-memory-type", mem_type)
+        # nvvidconv1.set_property("nvbuf-memory-type", mem_type)
+        # tiler.set_property("nvbuf-memory-type", mem_type)
      
 
     print("Adding elements to Pipeline \n")
@@ -685,7 +686,8 @@ def main(args):
         encoder = Gst.ElementFactory.make("nvv4l2h264enc", f"encoder_{i}") # nvv4l2h264enc
         pipeline.add(encoder)
         encoder.set_property("bitrate", 180000)
-        encoder.set_property("preset-level", "FastPreset")
+        if is_aarch64():
+            encoder.set_property("preset-level", "FastPreset")
         container = Gst.ElementFactory.make("mpegtsmux", f"mux_{i}")
         pipeline.add(container)
         if not is_aarch64():
