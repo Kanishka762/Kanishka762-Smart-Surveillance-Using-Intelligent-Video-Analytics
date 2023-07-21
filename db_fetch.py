@@ -75,4 +75,4 @@ def fetch_db():
             print("PostgreSQL connection is closed")
 
 device_data = fetch_db()
-# print(device_data)
+print(device_data)
