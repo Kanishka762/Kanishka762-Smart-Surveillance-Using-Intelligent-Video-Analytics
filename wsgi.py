@@ -2,6 +2,7 @@ import os
 from os.path import join, dirname
 import ast
 from dotenv import load_dotenv
+import shutil
 
 from warehouse import main
 from testing_tenant import filter_devices
@@ -14,13 +15,13 @@ rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
 if __name__ == '__main__':
     # sys.exit(main(sys.argv))
 
-    # if os.path.exists("./Hls_output"):
-    #     # Delete Folder code
-    #     shutil.rmtree("./Hls_output")
+    if os.path.exists("./Hls_output"):
+        # Delete Folder code
+        shutil.rmtree("./Hls_output")
     
-    # if os.path.exists("./Gif_output"):
-    #     # Delete Folder code
-    #     shutil.rmtree("./Gif_output")
+    if os.path.exists("./Gif_output"):
+        # Delete Folder code
+        shutil.rmtree("./Gif_output")
     
     # load_lmdb_list()
     # print("removed lmdb contents")
