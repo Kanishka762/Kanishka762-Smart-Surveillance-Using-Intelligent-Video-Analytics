@@ -44,12 +44,18 @@ def dbpush_activities(act_out):
         connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
         # Create a cursor object
         cursor=connection.cursor(cursor_factory=RealDictCursor)
-        
+
         # Convert the object array to JSON string
         object_array = json.dumps(act_out['metaData']['object'])
             
         # to form the title
         data = act_out['metaData']['object']
+
+        # Convert 'None' to an empty string for the 'activity' field
+        for obj in data:
+            if obj['activity'] is None:
+                obj['activity'] = ''
+        
         num_people = len([item for item in data if item['class'] == 'Male' or item['class'] == 'Female'])
         activities = list(set([item['activity'] for item in data if item['activity'] is not None])) or [None]
         if activities is None:
@@ -101,7 +107,7 @@ def dbpush_activities(act_out):
             ),
             inserted_logs AS (
             INSERT INTO "Logs" (id, "tenantId", "_id", class, track, activity, cid, "memberId", "activityId", "createdAt", "updatedAt")
-            SELECT uuid_generate_v4(), %(tenantId)s, object->>'id', object->>'class', object->>'track', object->>'activity', object->>'cids', %(memberId)s, inserted_activity.id, NOW(), NOW()
+            SELECT uuid_generate_v4(), %(tenantId)s, object->>'id', object->>'class', object->>'track', CASE WHEN object->>'activity' <> '' THEN object->>'activity' ELSE NULL END, object->>'cids', %(memberId)s, inserted_activity.id, NOW(), NOW()
             FROM inserted_activity, jsonb_array_elements(%(objects)s) AS object
             RETURNING id
             ),
@@ -273,7 +279,7 @@ def dbpush_members(mem_out):
     
     
     
-# act_dict = {'type': 'anomaly', 'deviceid': '61026472-0167-4c7d-955e-8f3a63269e8b', 'batchid': 'd41b811b-78b5-4d5a-85e4-ea68b0c631ed', 'timestamp': '2023-05-29 13:08:42.798887+05:30', 'geo': {'latitude': 26.25, 'longitude': 88.11}, 'metaData': {'detect': 1, 'frameAnomalyScore': 50.0, 'count': {'peopleCount': 1, 'vehicleCount': 0, 'ObjectCount': 0}, 'anomalyIds': [], 'cid': 'QmasG5hmAwruBUGEKDKfd8uSVFLM7AhemgoMs7fe5A9vfB', 'object': [{'class': 'Person', 'detectionScore': 50.0, 'activityScore': 100.0, 'track': '100', 'id': '1', 'memDID': '', 'activity': 'throwing', 'detectTime': '2023-05-29 13:08:42.798887+05:30', 'cids': 'Qma73sWHKkbzq65pMxs4b7TAHHL6XMA3nXp9BdNNHUa9vA'}]}, 'tenantId': '3d77252b-ba26-451a-8ad4-ee18159a6db8', 'version': 'v0.0.3'}
+# act_dict = {'type': 'anomaly', 'deviceid': '63627047-611a-46fb-81e2-7c6cfe0b32ca', 'batchid': 'd50ab502-c52f-46a1-ac2f-acca357f7997', 'timestamp': '2023-07-22 13:09:41.370124+05:30', 'geo': {'latitude': 28.7, 'longitude': 77.1}, 'metaData': {'detect': 2, 'frameAnomalyScore': 0.0, 'count': {'peopleCount': 2, 'vehicleCount': 0, 'ObjectCount': 0}, 'anomalyIds': [], 'cid': 'QmRBUoyiL5UqJFhAc4EgTQ4MbX9pzqochD3G9heU17zSAm', 'object': [{'class': 'Male', 'detectionScore': 0.0, 'activityScore': 0.0, 'track': None, 'id': '2', 'memDID': 'None', 'activity': 'No Activity', 'detectTime': '2023-07-22 13:09:41.370124+05:30', 'cids': 'QmQKPtUeZbcunpu6XkhvNKmw2aTDZE2KxAJg35sG5gToJr'}, {'class': 'Gun', 'detectionScore': 0.0, 'activityScore': 0.0, 'track': None, 'id': '5', 'memDID': 'None', 'activity': 'No Activity', 'detectTime': '2023-07-22 13:09:41.370124+05:30', 'cids': 'QmTFdL2FnNmwitme6UBhcrxWWTsEYfwaGtHGkyvyBRZe3z'}]}, 'tenantId': '41335e9a-05d9-4cca-99c6-a44dc4217056', 'version': 'v0.0.4'}
 # dbpush_activities(act_dict)
 
 # mem_dict = {'type': 'activity', 'deviceid': 'daf2a1b9-a5c7-47f0-a57c-e941f47b670a', 'batchid': 'bf72ff47-d794-4a17-aaad-f3a6733f03b1', 'timestamp': '2023-06-19 10:37:20.284136+05:30', 'geo': {'latitude': 26.25, 'longitude': 88.11}, 'metaData': {'detect': 1, 'frameAnomalyScore': 31.990000000000006, 'count': {'peopleCount': 1, 'vehicleCount': 0, 'ObjectCount': 0}, 'anomalyIds': [], 'cid': 'QmdbLLjUfi5mBoQBxTerYDwEqvq6tS9sbf7wW5szSBxdTM', 'object': [{'class': 'Person', 'detectionScore': 37.388000000000005, 'activityScore': 10.0, 'track': '100', 'id': '4', 'memDID': None, 'activity': 'Standing', 'detectTime': '2023-06-19 10:37:20.284136+05:30', 'cids': 'Qmd2FwoTXZTVNPk2xj1iYiX5MyEaX1SYafwXGhBBZUkFfz'}]}, 'tenantId': 'e410d5e8-9da4-4144-9dae-78066a71be8b', 'version': 'v0.0.3'}
