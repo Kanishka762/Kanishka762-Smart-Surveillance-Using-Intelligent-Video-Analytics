@@ -105,8 +105,8 @@ def merge_activity(act_batch_res, output_json):
                 # print(act_batch_res)
                 # print(act_batch_res[obj["id"]])
                 obj["activity"] = act_batch_res[int(obj["id"])]
-            else:
-                obj["activity"] = None
+            # else:
+            #     obj["activity"] = None
     return output_json
 
 async def json_publish_activity(primary):
@@ -224,7 +224,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
         obj_dict = {}
         obj_dict[objectt["obj_id"]] = {}
         obj_dict[objectt["obj_id"]]["type"] = objectt["detect_type"]
-        obj_dict[objectt["obj_id"]]["activity"] = "No"
+        obj_dict[objectt["obj_id"]]["activity"] = "No Activity"
         obj_dict[objectt["obj_id"]]["confidence"] = objectt["confidence_score"]
         obj_dict[objectt["obj_id"]]["did"] = None
         obj_dict[objectt["obj_id"]]["track_type"] = None
@@ -254,7 +254,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
         isolate_queue[device_id].append(final_frame)
 
     for each in isolate_queue:
-        if len(isolate_queue[each])>279:
+        if len(isolate_queue[each])>99:
             batch_data = isolate_queue[each]
             isolate_queue[each] = []
             asyncio.run(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp,datainfo))

@@ -5,7 +5,12 @@ import tempfile
 
 import os
 import sys
-# sys.path.append('/home/agx123/DS_pipeline_new/mini_mmaction')
+from common.is_aarch_64 import is_aarch64
+
+# if is_aarch64():
+#     sys.path.append('/home/agx123/DS_pipeline_new/mini_mmaction')
+
+sys.path.append('./mini_mmaction')
 
 import cv2
 import mmcv
