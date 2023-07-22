@@ -204,6 +204,7 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
     
     # buf_surface = pyds.get_nvds_buf_surface(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
+    print(l_frame)
     while l_frame is not None:
         try:
             # Note that l_frame.data needs a cast to pyds.NvDsFrameMeta
@@ -315,9 +316,9 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
             except StopIteration:
                 break
 
-        # Acquiring a display meta object. The memory ownership remains in
-        # the C code so downstream plugins can still access it. Otherwise
-        # the garbage collector will claim it when this probe function exits.
+        # # Acquiring a display meta object. The memory ownership remains in
+        # # the C code so downstream plugins can still access it. Otherwise
+        # # the garbage collector will claim it when this probe function exits.
         display_meta=pyds.nvds_acquire_display_meta_from_pool(batch_meta)
         display_meta.num_labels = 1
         py_nvosd_text_params = display_meta.text_params[0]
@@ -348,13 +349,13 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
         pyds.nvds_add_display_meta_to_frame(frame_meta, display_meta)
         try:
             l_frame=l_frame.next
-            detect_data.append(frame_dict)   #optional line detect_data is not used any where just holding all frame_dicts
+            # detect_data.append(frame_dict)   #optional line detect_data is not used any where just holding all frame_dicts
             if n_frame_bbox is not None:
-                cv2.imwrite("test1.jpg",n_frame_bbox)
+                # cv2.imwrite("test1.jpg",n_frame_bbox)
                 frame_dict['np_arr'] = n_frame_bbox   
                 frame_dict['org_frame'] = n_frame
             else:
-                cv2.imwrite("test1.jpg",frame_copy)
+                # cv2.imwrite("test1.jpg",frame_copy)
 
                 frame_dict['np_arr'] = frame_copy
                 frame_dict['org_frame'] = n_frame
@@ -363,6 +364,9 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
             datainfo = [[],[],[],[]]
             # print(frame_dict)
             frame_2_dict(frame_dict,dev_id_dict,datainfo)
+            # frame_dict.clear()
+            if is_aarch64():
+                pyds.unmap_nvds_buf_surface(hash(gst_buffer), frame_meta.batch_id)
         except StopIteration:
             break
     return Gst.PadProbeReturn.OK	
