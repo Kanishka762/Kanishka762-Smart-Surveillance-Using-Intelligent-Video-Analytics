@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from db_push import gif_push
 from os.path import join, dirname
+import asyncio
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -11,7 +12,7 @@ gif_path = os.getenv("path_gif")
 if os.path.exists(gif_path) is False:
     os.mkdir(gif_path)
 
-async def gif_build(img_arr, device_meta, gif_dict):
+async def gif_build(img_arr, device_meta, gif_dict, gif_created):
     
     device_id = device_meta['deviceId']
       
@@ -22,11 +23,17 @@ async def gif_build(img_arr, device_meta, gif_dict):
         
     path = video_name_gif + '/' + 'camera.gif'
     
-    gif_dict[device_id].append(img_arr)
-    len_dict = len(gif_dict[device_id])
+    if gif_created[device_id] == False:
+        gif_dict[device_id].append(img_arr)
+        len_dict = len(gif_dict[device_id])
     
-    if(len_dict == 200):
-        gif_push(path, device_meta, gif_dict[device_id][-100:])
+        if(len_dict == 200):
+            print("LENGTH OF DICTIONARY: ",len_dict)
+            gif_created[device_id] = True
+            asyncio.create_task(gif_push(path, device_meta, gif_dict[device_id][-100:]))
+            
+        # gif_push(path, device_meta, gif_dict[device_id][-100:])
+        
     
     # print(f"DEVICE ID:{device_id} ---------->  LENGTH OF DEVICE ID:{len_dict}")
     

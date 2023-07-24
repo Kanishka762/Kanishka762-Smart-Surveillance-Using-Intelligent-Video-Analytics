@@ -3,9 +3,12 @@ from os.path import join, dirname
 import ast
 from dotenv import load_dotenv
 import shutil
+import asyncio
+import threading 
 
 from warehouse import main
 from testing_tenant import filter_devices
+from db_push import gst_hls_push
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -56,6 +59,7 @@ if __name__ == '__main__':
         dev_details.append(device_dict)
         if i == 1:
             break
-    # threading.Thread(target=gst_hls_push,args=(dev_details,)).start()
+    threading.Thread(target=gst_hls_push,args=(dev_details,)).start()
+    # asyncio.create_task(gst_hls_push(dev_details))
     main(dev_details)
 
