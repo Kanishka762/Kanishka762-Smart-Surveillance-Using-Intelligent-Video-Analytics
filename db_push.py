@@ -53,6 +53,7 @@ def gst_hls_push(deviceInfo):
             cursor.close()
             connection.close()    
             print("Updated the uri column in device table")
+            return
         except psycopg2.errors.SerializationFailure as e:
             # If the transaction encounters a serialization failure, retry with exponential backoff
             print(f"Transaction serialization failure: {e}")
@@ -100,7 +101,7 @@ def gst_hls_push(deviceInfo):
             return
             #time.sleep(15)
 
-def gif_push(file_path, device_info, gifBatch):
+async def gif_push(file_path, device_info, gifBatch):
     
     deviceId = device_info['deviceId']
     tenantId = device_info['tenantId']
@@ -172,7 +173,7 @@ def gif_push(file_path, device_info, gifBatch):
         connection.commit()
         cursor.close()
         connection.close()       
-        
+        return
     except psycopg2.errors.SerializationFailure as e:
         # If the transaction encounters a serialization failure, retry with exponential backoff
         print(f"Transaction serialization failure: {e}")
