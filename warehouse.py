@@ -91,6 +91,7 @@ if os.path.exists(hls_path) is False:
 dev_id_dict = {}
 gif_dict = {}
 detect_data = []
+gif_created = {}
 # MAX_DISPLAY_LEN=64
 PGIE_CLASS_ID_MALE = 0
 PGIE_CLASS_ID_FEMALE = 1
@@ -204,7 +205,6 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
     
     # buf_surface = pyds.get_nvds_buf_surface(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
-    print(l_frame)
     while l_frame is not None:
         try:
             # Note that l_frame.data needs a cast to pyds.NvDsFrameMeta
@@ -234,8 +234,10 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
             device_id = value['deviceId']
             if device_id not in gif_dict:
                 gif_dict[device_id] = []
-                
-        # asyncio.run(gif_build(n_frame_copy, dev_id_dict[camera_id], gif_dict))
+            if device_id not in gif_created:
+                gif_created[device_id] = False
+     
+        asyncio.run(gif_build(n_frame_copy, dev_id_dict[camera_id], gif_dict, gif_created))
         
         num_detect = frame_meta.num_obj_meta
         device_timestamp = datetime.datetime.now(timezone)
@@ -725,7 +727,7 @@ def main(args):
 
 
     # create an event loop and feed gstreamer bus mesages to it
-    loop = GObject.MainLoop()
+    loop = GLib.MainLoop()
     bus = pipeline.get_bus()
     bus.add_signal_watch()
     bus.connect ("message", bus_call, loop)
