@@ -101,7 +101,7 @@ def gst_hls_push(deviceInfo):
             return
             #time.sleep(15)
 
-async def gif_push(file_path, device_info, gifBatch):
+def gif_push(file_path, device_info, gifBatch):
     
     deviceId = device_info['deviceId']
     tenantId = device_info['tenantId']
