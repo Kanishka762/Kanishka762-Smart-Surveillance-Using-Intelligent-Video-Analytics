@@ -214,7 +214,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
     frame_data = []
     bbox_list = []
     bbox_ref_list = []
-
+    
     for objectt in inputt["objects"]:
         if objectt["detect_type"] in anamoly_object and objectt["age"] > trigger_age:
             trigger_age = trigger_age + 1
