@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from db_push import gif_push
 from os.path import join, dirname
 import asyncio
+import threading
 
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -30,7 +31,8 @@ async def gif_build(img_arr, device_meta, gif_dict, gif_created):
         if(len_dict == 200):
             print("LENGTH OF DICTIONARY: ",len_dict)
             gif_created[device_id] = True
-            asyncio.create_task(gif_push(path, device_meta, gif_dict[device_id][-100:]))
+            # asyncio.create_task(gif_push(path, device_meta, gif_dict[device_id][-100:]))
+            threading.Thread(target=gif_push,args=(path, device_meta, gif_dict[device_id][-100:],)).start()
             
         # gif_push(path, device_meta, gif_dict[device_id][-100:])
         
