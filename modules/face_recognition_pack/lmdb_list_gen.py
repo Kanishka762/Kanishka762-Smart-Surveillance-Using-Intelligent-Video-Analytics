@@ -5,7 +5,8 @@ from io import BytesIO
 import io
 from PIL import Image
 import face_recognition 
-
+import os
+from os.path import join, dirname
 
 known_blacklist_faces = []
 known_blacklist_id = []
@@ -14,9 +15,12 @@ known_whitelist_id = []
 
 
 
+cwd = os.getcwd()
+static_path = join(cwd, 'static')
+lmdb_path = join(static_path, 'lmdb')
 
 #load lmdb
-env = lmdb.open('./lmdb/face-detection.lmdb',
+env = lmdb.open(lmdb_path+'/face-detection.lmdb',
                 max_dbs=10, map_size=int(100e9))
 
 

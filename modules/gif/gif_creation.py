@@ -1,15 +1,22 @@
 import os
-from dotenv import load_dotenv
-from db_push import gif_push
 from os.path import join, dirname
+from dotenv import load_dotenv
+from modules.db.db_push import gif_push
 import asyncio
 import threading
 
-dotenv_path = join(dirname(__file__), '.env')
+cwd = os.getcwd()
+
+static_path = join(cwd, 'static')
+gif_path = join(static_path, 'Gif_output')
+
+data_path = join(cwd, 'data')
+dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
-# gif_path = "./Gif_output"
-gif_path = os.getenv("path_gif")
+
+# gif_path = os.getenv("path_gif")
+print(gif_path)
 if os.path.exists(gif_path) is False:
     os.mkdir(gif_path)
 

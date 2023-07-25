@@ -1,7 +1,6 @@
 import os
 import shutil
 
-
 def remove_cnts(folder):
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
