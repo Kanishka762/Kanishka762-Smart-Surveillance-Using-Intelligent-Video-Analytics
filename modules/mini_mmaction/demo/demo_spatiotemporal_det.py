@@ -10,7 +10,7 @@ from common.is_aarch_64 import is_aarch64
 # if is_aarch64():
 #     sys.path.append('/home/agx123/DS_pipeline_new/mini_mmaction')
 
-sys.path.append('./mini_mmaction')
+sys.path.append('.modules/mini_mmaction')
 
 import cv2
 import mmcv
@@ -35,14 +35,14 @@ cur_dir=os.getcwd()
 sys.path.append(cur_dir)
 
 
-args_video = cur_dir + "/demo/demo.mp4"
+# args_video = cur_dir + "/demo/demo.mp4"
 args_short_side = 256
-args_config = cur_dir + '/mini_mmaction/configs/detection/slowfast/slowfast_kinetics400-pretrained-r50_8xb16-4x16x1-20e_ava21-rgb.py'
+args_config = cur_dir + '/modules/mini_mmaction/configs/detection/slowfast/slowfast_kinetics400-pretrained-r50_8xb16-4x16x1-20e_ava21-rgb.py'
 args_cfg_options = {}
 args_predict_stepsize = 8
-args_label_map = cur_dir + "/mini_mmaction/tools/label_map.txt"
-args_det_config = cur_dir + "/mini_mmaction/demo/demo_configs/faster-rcnn_r50_fpn_2x_coco_infer.py"
-args_det_checkpoint =  "http://download.openmmlab.com/mmdetection/v2.0/faster_rcnn/faster_rcnn_r50_fpn_2x_coco/faster_rcnn_r50_fpn_2x_coco_bbox_mAP-0.384_20200504_210434-a5d8aa15.pth"
+args_label_map = cur_dir + "/modules/mini_mmaction/tools/label_map.txt"
+args_det_config = cur_dir + "/modules/mini_mmaction/demo/demo_configs/faster-rcnn_r50_fpn_2x_coco_infer.py"
+# args_det_checkpoint =  "http://download.openmmlab.com/mmdetection/v2.0/faster_rcnn/faster_rcnn_r50_fpn_2x_coco/faster_rcnn_r50_fpn_2x_coco_bbox_mAP-0.384_20200504_210434-a5d8aa15.pth"
 args_det_score_thr = 0.9
 args_det_cat_id = 0
 args_device =  "cuda:0"

@@ -1,4 +1,4 @@
-from ava_action_list import data , object_score, anamoly_rank
+from modules.anomaly.anomaly_score_config import data , object_score, anamoly_rank
 
 
 # frame_info = [{2: {'type': 'Person', 'activity': 'run', 'confidence': 0.5413001179695129}}]

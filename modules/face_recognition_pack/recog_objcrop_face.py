@@ -14,7 +14,7 @@ import uuid
 
 # model_face = get_model("resnet50_2020-07-20", max_size=2048)
 # model_face.eval()
-from alarm_light_trigger import alarm
+from modules.alarm.alarm_light_trigger import alarm
 face_did_encoding_store = dict()
 TOLERANCE = 0.70
 batch_person_id = []

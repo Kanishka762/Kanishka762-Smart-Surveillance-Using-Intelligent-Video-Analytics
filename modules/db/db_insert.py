@@ -11,8 +11,9 @@ import ast
 import uuid
 import reverse_geocode
 import json
-
-dotenv_path = join(dirname(__file__), '.env')
+cwd = os.getcwd()
+data_path = join(cwd, 'data')
+dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")

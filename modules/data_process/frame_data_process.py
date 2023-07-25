@@ -14,18 +14,20 @@ import numpy as np
 import asyncio
 import threading
 
-from alarm_light_trigger import alarm
-from try_anamoly import anamoly_score_calculator, frame_weighted_avg
-from project_1_update_ import output_func
-from db_insert import dbpush_activities, dbpush_members
-from person_type_new import find_person_type
+from modules.alarm.alarm_light_trigger import alarm
+from modules.anomaly.anomaly_score import anamoly_score_calculator, frame_weighted_avg
+from modules.components.batchdata2json import output_func
+from modules.db.db_insert import dbpush_activities, dbpush_members
+from modules.face_recognition_pack.recog_objcrop_face import find_person_type
 # from warehouse import get_info
 
 import cv2
-from mini_mmaction.demo.demo_spatiotemporal_det import activity_main
+from modules.mini_mmaction.demo.demo_spatiotemporal_det import activity_main
 
 path = os.getcwd()
-dotenv_path = join(dirname(__file__), '.env')
+cwd = os.getcwd()
+data_path = join(cwd, 'data')
+dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
@@ -51,6 +53,10 @@ frame_cnt = 0
 isolate_queue = {}
 trigger_age = 1
 
+cwd = os.getcwd()
+static_path = join(cwd,'static')
+ipfs_tempdata_path = join(static_path,'ipfs_data')
+print(ipfs_tempdata_path)
 def conv_path2cid(pathh):
     command = 'ipfs --api={ipfs_url} add {file_path} -Q'.format(file_path=pathh,ipfs_url=ipfs_url)
     output = sp.getoutput(command)
@@ -59,20 +65,20 @@ def conv_path2cid(pathh):
 def conv_jsonnumpy_2_jsoncid(primary):
     # convert full frame numpy to cid
     # print(primary)
-    if not os.path.exists("./ipfs_data"):
-        os.makedirs("./ipfs_data")
-    if not os.path.exists("./ipfs_data/"+primary['deviceid']):
-        os.makedirs("./ipfs_data/"+primary['deviceid'])
-    pathh = "./ipfs_data/"+primary['deviceid']+"/cid_ref_full.jpg"
+    if not os.path.exists(ipfs_tempdata_path):
+        os.makedirs(ipfs_tempdata_path)
+    if not os.path.exists(ipfs_tempdata_path+"/"+primary['deviceid']):
+        os.makedirs(ipfs_tempdata_path+"/"+primary['deviceid'])
+    pathh = ipfs_tempdata_path+"/"+primary['deviceid']+"/cid_ref_full.jpg"
     cv2.imwrite(pathh,primary["metaData"]['cid'][0])
     primary["metaData"]['cid'] = conv_path2cid(pathh)
 
     for each in primary["metaData"]["object"]:
         
-        pathh = "./ipfs_data/"+primary['deviceid']+"/cid_ref.jpg"
+        pathh = ipfs_tempdata_path+"/"+primary['deviceid']+"/cid_ref.jpg"
         cv2.imwrite(pathh,np.array(each["cids"][0], dtype=np.uint8))
         each["cids"] = conv_path2cid(pathh)
-    # pathh = "./ipfs_data/"+primary['deviceid']+"/cid_ref_full.jpg"
+    # pathh = ipfs_tempdata_path+"/"+primary['deviceid']+"/cid_ref_full.jpg"
     # cv2.imwrite(pathh,np.array(primary["metaData"]['cid'][0], dtype=np.uint8))
     # primary["cid"] = primary["cid"]
     # print(primary)
@@ -94,7 +100,7 @@ def face_recognition_process(output_json,datainfo,device_id):
     output_json = conv_jsonnumpy_2_jsoncid(output_json)
     print("\n")
     print(f'FACE OUTPUT: {output_json}')
-    with open("test.json", "a") as outfile:
+    with open("./static/test.json", "a") as outfile:
         json.dump(output_json, outfile)
 
 
@@ -123,6 +129,7 @@ async def json_publish_activity(primary):
 
 def process_results(device_id,batch_data,device_data,device_timestamp, datainfo, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
     act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
+    print(act_batch_res)
     output_json = merge_activity(act_batch_res, output_json)
 
     if output_json['metaData']['object']:
@@ -167,7 +174,7 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
                 # face_recognition_process(output_json_fr,datainfo,device_id)
                 #did,track_type = find_person_type(objectt["crop"], datainfo)
 
-                with open("test.json", "a") as outfile:
+                with open("./static/test.json", "a") as outfile:
                     json.dump(output_json, outfile)
             elif(status == "FAILURE!!"):
                 print("DB insertion got failed :(")
@@ -180,7 +187,7 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
             if(status == "SUCCESS!!"):
                 print("DB insertion successful :)")
                 # face_recognition_process(output_json_fr,datainfo,device_id)
-                with open("test.json", "a") as outfile:
+                with open("./static/test.json", "a") as outfile:
                     json.dump(output_json, outfile)
             elif(status == "FAILURE!!"):
                 print("DB insertion got failed :(")   
@@ -195,7 +202,7 @@ async def process_publish(device_id,batch_data,device_data,device_timestamp, dat
         if each["total_detects"] > detectss:
             detectss = each["total_detects"]
             print("detectss: ",detectss)
-            cv2.imwrite("max_det.jpg", each["det_frame"][0])
+            # cv2.imwrite("./static/img_max_det.jpg", each["det_frame"][0])
             fin_full_frame = each["det_frame"]
     bbox_tensor_lst = [frame_data["bbox_tensor"] for frame_data in batch_data]
     org_frames_lst = [frame_data["org_frame"] for frame_data in batch_data]
@@ -254,7 +261,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
         isolate_queue[device_id].append(final_frame)
 
     for each in isolate_queue:
-        if len(isolate_queue[each])>99:
+        if len(isolate_queue[each])>279:
             batch_data = isolate_queue[each]
             isolate_queue[each] = []
             asyncio.run(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp,datainfo))
