@@ -39,7 +39,7 @@ gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
 from gi.repository import GLib
 from ctypes import *
-import sys
+# import sys
 import math
 import platform
 from common.is_aarch_64 import is_aarch64
@@ -47,52 +47,45 @@ from common.bus_call import bus_call
 from datetime import datetime
 import datetime
 import shutil
-
-# from common.FPS import GETFPS
-# from sparkplug_b import *
 import pyds
 import pytz
-import datetime
+# import datetime
 import numpy as np
 import cv2
 import asyncio
-
-from json_structure import frame_2_dict
 from dotenv import load_dotenv
-from gif_creation import gif_build
-from db_fetch_members import fetch_db_mem
-from db_push import gif_push, gst_hls_push
-from facedatainsert_lmdb import add_member_to_lmdb
-from lmdb_list_gen import attendance_lmdb_known, attendance_lmdb_unknown
-from generate_crop import save_one_box
 
+from modules.gif.gif_creation import gif_build
+from modules.db.db_fetch_members import fetch_db_mem
+from modules.db.db_push import gif_push, gst_hls_push
+from modules.face_recognition_pack.facedatainsert_lmdb import add_member_to_lmdb
+from modules.face_recognition_pack.lmdb_list_gen import attendance_lmdb_known, attendance_lmdb_unknown
+from modules.components.generate_crop import save_one_box
+from modules.data_process.frame_data_process import frame_2_dict
 
 path = os.getcwd()
-
-dotenv_path = join(dirname(__file__), '.env')
+cwd = os.getcwd()
+data_path = join(cwd, 'data')
+dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 device = os.getenv("device")
 tenant_name = os.getenv("tenant_name")
-
 # rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
-hls_path = os.getenv("path_hls")
+# hls_path = os.getenv("path_hls")
 place = os.getenv("place")
+
 timezone = pytz.timezone(f'{place}')  #assign timezone
 config_path = path + f"/models_deepstream/{tenant_name}/{device}/config.txt"
 
+
+
+
 age_dict = {}
-
-# hls_path = path + "/Hls_output"
-if os.path.exists(hls_path) is False:
-    os.mkdir(hls_path)
-
-# timezone = pytz.timezone('Asia/Kolkata')   
 dev_id_dict = {}
 gif_dict = {}
 detect_data = []
 gif_created = {}
-# MAX_DISPLAY_LEN=64
 PGIE_CLASS_ID_MALE = 0
 PGIE_CLASS_ID_FEMALE = 1
 PGIE_CLASS_ID_FIRE = 2
@@ -100,16 +93,26 @@ PGIE_CLASS_ID_SMOKE = 3
 PGIE_CLASS_ID_GUN = 4
 PGIE_CLASS_ID_KNIFE = 5
 past_tracking_meta=[0]
-# MUXER_OUTPUT_WIDTH=1920
-# MUXER_OUTPUT_HEIGHT=1080
-# MUXER_BATCH_TIMEOUT_USEC=4000000
-# TILED_OUTPUT_WIDTH=1280
-# TILED_OUTPUT_HEIGHT=720
-# GST_CAPS_FEATURES_NVMM="memory:NVMM"
 OSD_PROCESS_MODE= 0
 OSD_DISPLAY_TEXT= 1
 pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
- 
+
+
+static_path = join(cwd, 'static')
+gif_path = join(static_path, 'Gif_output')
+hls_path = join(static_path, 'Hls_output')
+
+if os.path.exists(gif_path):
+    shutil.rmtree(gif_path)
+if os.path.exists(gif_path) is False:
+    os.mkdir(gif_path)
+
+if os.path.exists(hls_path):
+    shutil.rmtree(hls_path)
+if os.path.exists(hls_path) is False:
+    os.mkdir(hls_path)
+
+
 def load_lmdb_list():
     known_whitelist_faces1, known_whitelist_id1 = attendance_lmdb_known()
     known_blacklist_faces1, known_blacklist_id1 = attendance_lmdb_unknown()
@@ -375,7 +378,6 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
 
  ######################################################################
 
-
 def cb_newpad(decodebin, decoder_src_pad,data):
     print("In cb_newpad\n")
     caps=decoder_src_pad.get_current_caps()
@@ -411,8 +413,6 @@ def decodebin_child_added(child_proxy,Object,name,user_data):
         source_element = child_proxy.get_by_name("source")
         if source_element.find_property('drop-on-latency') != None:
             Object.set_property("drop-on-latency", True)
-
-
 
 def create_source_bin(index,uri):
     print("Creating source bin")
@@ -461,7 +461,7 @@ def create_source_bin(index,uri):
 
  ######################################################################
 
-def main(args):
+def start_deepstream(args):
     print(args)
     global dev_id_dict
     # Check input arguments
@@ -469,9 +469,6 @@ def main(args):
     if len(args) < 2:
         sys.stderr.write("usage: %s <uri1> [uri2] ... [uriN]\n" % args[0])
         sys.exit(1)
-
-    # for i in range(0,len(args)-1):
-    #     fps_streams["stream{0}".format(i)]=GETFPS(i)
     number_sources=len(args)-1
     print(number_sources)
 
@@ -554,7 +551,7 @@ def main(args):
 
 
     config = configparser.ConfigParser()
-    config.read('dstest2_tracker_config.txt')
+    config.read('./data/dstest2_tracker_config.txt')
     config.sections()
 
     for key in config['tracker']:
@@ -746,7 +743,6 @@ def main(args):
         if (i != 0):
             print(i, ": ", source)
 
-######################################################################
     print("Starting pipeline \n")
     # start play back and listed to events		
     pipeline.set_state(Gst.State.PLAYING)

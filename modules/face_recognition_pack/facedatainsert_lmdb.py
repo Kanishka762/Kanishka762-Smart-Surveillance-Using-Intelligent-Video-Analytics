@@ -11,23 +11,29 @@ import subprocess as sp
 import os
 from os.path import join, dirname
 from dotenv import load_dotenv
-from faceData import remove_cnts
+from modules.components.clean_dir import remove_cnts
 
-dotenv_path = join(dirname(__file__), '.env')
+
+cwd = os.getcwd()
+data_path = join(cwd, 'data')
+static_path = join(cwd,'static')
+lmdb_path = join(static_path,'lmdb')
+image_path = join(static_path,'image')
+dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
-if os.path.exists("./lmdb"):
-    remove_cnts("./lmdb")
-if not os.path.exists("./lmdb"):
-    os.makedirs("./lmdb")
+if os.path.exists(lmdb_path):
+    remove_cnts(lmdb_path)
+if not os.path.exists(lmdb_path):
+    os.makedirs(lmdb_path)
 
-if os.path.exists("./image"):
-    remove_cnts("./image")
-if not os.path.exists("./image"):
-    os.makedirs("./image")
+if os.path.exists(image_path):
+    remove_cnts(image_path)
+if not os.path.exists(image_path):
+    os.makedirs(image_path)
 
-env = lmdb.open('./lmdb/face-detection.lmdb',
+env = lmdb.open(lmdb_path+'/face-detection.lmdb',
                 max_dbs=10, map_size=int(100e9))
 
 known_db = env.open_db(b'white_list')
@@ -48,7 +54,7 @@ def cid_to_image(cid):
     #'ipfs --api={ipfs_url} add {file_path} -Q'.format(ipfs_url=ipfs_url, file_path=src_file)
     command = 'ipfs --api={ipfs_url} get {cid}'.format(ipfs_url=ipfs_url,cid=cid)
     output = sp.getoutput(command)
-    image_path = "./image/"+str(cid)+".jpg"
+    image_path = image_path+str(cid)+".jpg"
     os.rename(cid, image_path)
     return image_path
 
@@ -74,7 +80,7 @@ def add_member_to_lmdb(MemberPublish):
 
         status  = insert_db(memberId, person_img_bytes, db_)
         print("inserted",status)
-        print("_______________________________________-")
+        print("_______________________________________")
         return status
 
 # # #get json from nats and call add_member_to_lmdb(nats_json)
