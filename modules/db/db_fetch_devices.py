@@ -65,5 +65,5 @@ def filter_devices():
 
 
 
-device_data = fetch_db()
-print(device_data)
+# device_data = fetch_db()
+# print(device_data)
