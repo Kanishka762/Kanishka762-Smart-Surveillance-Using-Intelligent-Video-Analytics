@@ -12,7 +12,6 @@ import subprocess as sp
 import os
 from os.path import join, dirname
 from dotenv import load_dotenv
-from modules.components.clean_dir import remove_cnts
 
 load_dotenv(dotenv_path)
 
