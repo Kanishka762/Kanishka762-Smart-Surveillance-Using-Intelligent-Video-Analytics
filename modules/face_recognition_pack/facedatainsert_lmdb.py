@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 import lmdb
 import cv2
 import numpy as np
@@ -13,25 +14,9 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 from modules.components.clean_dir import remove_cnts
 
-
-cwd = os.getcwd()
-data_path = join(cwd, 'data')
-static_path = join(cwd,'static')
-lmdb_path = join(static_path,'lmdb')
-image_path = join(static_path,'image')
-dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
-if os.path.exists(lmdb_path):
-    remove_cnts(lmdb_path)
-if not os.path.exists(lmdb_path):
-    os.makedirs(lmdb_path)
-
-if os.path.exists(image_path):
-    remove_cnts(image_path)
-if not os.path.exists(image_path):
-    os.makedirs(image_path)
 
 env = lmdb.open(lmdb_path+'/face-detection.lmdb',
                 max_dbs=10, map_size=int(100e9))

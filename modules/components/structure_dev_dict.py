@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 import os 
 from os.path import join, dirname
 import ast
@@ -9,9 +10,9 @@ import threading
 from modules.db.db_push import gst_hls_push
 from modules.db.db_fetch_devices import filter_devices
 
-cwd = os.getcwd()
-data_path = join(cwd, 'data')
-dotenv_path = join(data_path, '.env')
+# cwd = os.getcwd()
+# data_path = join(cwd, 'data')
+# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))

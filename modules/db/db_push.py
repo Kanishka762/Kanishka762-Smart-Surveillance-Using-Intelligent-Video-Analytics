@@ -1,4 +1,4 @@
-
+from modules.components.load_paths import *
 import imageio
 import subprocess as sp
 from os.path import join, dirname
@@ -11,9 +11,9 @@ from pytz import timezone
 import cv2
 from psycopg2 import sql
 
-cwd = os.getcwd()
-data_path = join(cwd, 'data')
-dotenv_path = join(data_path, '.env')
+# cwd = os.getcwd()
+# data_path = join(cwd, 'data')
+# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")

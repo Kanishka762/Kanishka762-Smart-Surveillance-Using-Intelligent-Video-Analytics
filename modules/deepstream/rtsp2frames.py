@@ -22,7 +22,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 ################################################################################
-
+from modules.components.load_paths import *
 import argparse
 import sys
 sys.path.append('../')
@@ -63,20 +63,15 @@ from modules.face_recognition_pack.lmdb_list_gen import attendance_lmdb_known, a
 from modules.components.generate_crop import save_one_box
 from modules.data_process.frame_data_process import frame_2_dict
 
-path = os.getcwd()
-cwd = os.getcwd()
-data_path = join(cwd, 'data')
-dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 device = os.getenv("device")
 tenant_name = os.getenv("tenant_name")
-# rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
-# hls_path = os.getenv("path_hls")
+
 place = os.getenv("place")
 
 timezone = pytz.timezone(f'{place}')  #assign timezone
-config_path = path + f"/models_deepstream/{tenant_name}/{device}/config.txt"
+config_path = cwd + f"/models_deepstream/{tenant_name}/{device}/config.txt"
 
 
 
@@ -98,19 +93,11 @@ OSD_DISPLAY_TEXT= 1
 pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
 
 
-static_path = join(cwd, 'static')
-gif_path = join(static_path, 'Gif_output')
-hls_path = join(static_path, 'Hls_output')
+# static_path = join(cwd, 'static')
 
-if os.path.exists(gif_path):
-    shutil.rmtree(gif_path)
-if os.path.exists(gif_path) is False:
-    os.mkdir(gif_path)
 
-if os.path.exists(hls_path):
-    shutil.rmtree(hls_path)
-if os.path.exists(hls_path) is False:
-    os.mkdir(hls_path)
+# gif_path = join(static_path, 'Gif_output')
+# hls_path = join(static_path, 'Hls_output')
 
 
 def load_lmdb_list():

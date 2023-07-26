@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 import numpy as np
 import cv2 as cv
 import lmdb
@@ -14,10 +15,9 @@ known_whitelist_faces = []
 known_whitelist_id = []
 
 
-
-cwd = os.getcwd()
-static_path = join(cwd, 'static')
-lmdb_path = join(static_path, 'lmdb')
+# cwd = os.getcwd()
+# static_path = join(cwd, 'static')
+# lmdb_path = join(static_path, 'lmdb')
 
 #load lmdb
 env = lmdb.open(lmdb_path+'/face-detection.lmdb',

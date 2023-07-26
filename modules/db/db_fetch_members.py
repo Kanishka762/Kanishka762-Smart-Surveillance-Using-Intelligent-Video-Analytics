@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 import psycopg2
 from pytz import timezone 
 from datetime import datetime
@@ -7,9 +8,9 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 import ast
 
-cwd = os.getcwd()
-data_path = join(cwd, 'data')
-dotenv_path = join(data_path, '.env')
+# cwd = os.getcwd()
+# data_path = join(cwd, 'data')
+# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
