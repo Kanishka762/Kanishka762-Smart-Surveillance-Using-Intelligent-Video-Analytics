@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 import os
 from os.path import join, dirname
 from dotenv import load_dotenv
@@ -5,20 +6,20 @@ from modules.db.db_push import gif_push
 import asyncio
 import threading
 
-cwd = os.getcwd()
+# cwd = os.getcwd()
 
-static_path = join(cwd, 'static')
-gif_path = join(static_path, 'Gif_output')
+# static_path = join(cwd, 'static')
+# gif_path = join(static_path, 'Gif_output')
 
-data_path = join(cwd, 'data')
-dotenv_path = join(data_path, '.env')
+# data_path = join(cwd, 'data')
+# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 
-# gif_path = os.getenv("path_gif")
-print(gif_path)
-if os.path.exists(gif_path) is False:
-    os.mkdir(gif_path)
+# # gif_path = os.getenv("path_gif")
+# print(gif_path)
+# if os.path.exists(gif_path) is False:
+#     os.mkdir(gif_path)
 
 async def gif_build(img_arr, device_meta, gif_dict, gif_created):
     
