@@ -2,6 +2,7 @@ import os
 from os.path import join, dirname
 import shutil
 from modules.components.load_paths import *
+from modules.components.clean_dir import remove_cnts
 
 if os.path.exists(static_path):
     shutil.rmtree(static_path)
