@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 import psycopg2
 from psycopg2 import OperationalError, Error, DatabaseError
 from psycopg2.extras import RealDictCursor
@@ -11,9 +12,9 @@ import ast
 import uuid
 import reverse_geocode
 import json
-cwd = os.getcwd()
-data_path = join(cwd, 'data')
-dotenv_path = join(data_path, '.env')
+# cwd = os.getcwd()
+# data_path = join(cwd, 'data')
+# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")

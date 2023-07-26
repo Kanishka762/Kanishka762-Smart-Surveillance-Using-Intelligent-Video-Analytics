@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 import torch
 from pathlib import Path
 from PIL import Image
@@ -24,10 +25,10 @@ from modules.face_recognition_pack.recog_objcrop_face import find_person_type
 import cv2
 from modules.mini_mmaction.demo.demo_spatiotemporal_det import activity_main
 
-path = os.getcwd()
-cwd = os.getcwd()
-data_path = join(cwd, 'data')
-dotenv_path = join(data_path, '.env')
+# path = os.getcwd()
+# cwd = os.getcwd()
+# data_path = join(cwd, 'data')
+# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
@@ -53,9 +54,9 @@ frame_cnt = 0
 isolate_queue = {}
 trigger_age = 1
 
-cwd = os.getcwd()
-static_path = join(cwd,'static')
-ipfs_tempdata_path = join(static_path,'ipfs_data')
+# cwd = os.getcwd()
+# static_path = join(cwd,'static')
+# ipfs_tempdata_path = join(static_path,'ipfs_data')
 print(ipfs_tempdata_path)
 def conv_path2cid(pathh):
     command = 'ipfs --api={ipfs_url} add {file_path} -Q'.format(file_path=pathh,ipfs_url=ipfs_url)
