@@ -416,9 +416,10 @@ def create_source_bin(index,uri):
     # We will use decodebin and let it figure out the container format of the
     # stream and the codec and plug the appropriate demux and decode plugins.
     
-        # use nvurisrcbin to enable file-loop
+    # use nvurisrcbin to enable file-loop
     uri_decode_bin=Gst.ElementFactory.make("nvurisrcbin", "uri-decode-bin")
     uri_decode_bin.set_property("rtsp-reconnect-interval", 50)
+    uri_decode_bin.set_property("select-rtp-protocol", 4)
     # uri_decode_bin.set_property("file-loop", True)
     # uri_decode_bin.set_property("file-loop", "true")
     mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
