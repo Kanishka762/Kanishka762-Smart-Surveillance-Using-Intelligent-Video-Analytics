@@ -215,7 +215,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
     global anamoly_object, anamoly
     global frame_cnt
     global trigger_age
-    print("got imgs")
+    # print("got imgs")
     frame_timestamp = inputt["frame_timestamp"]
     frame_cnt += frame_cnt
     frame_data = []
