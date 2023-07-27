@@ -40,23 +40,18 @@ pgdb = os.getenv("pgdb")
 pgport = os.getenv("pgport")
 pguser = os.getenv("pguser")
 pgpassword = os.getenv("pgpassword")
+alarm_config = os.getenv("alarm_config")
+
 
 anamoly_object = ast.literal_eval(os.getenv("anamoly_object"))
 anamoly = ast.literal_eval(os.getenv("anamoly"))
 
 
-# anamoly_object =  ['Fire', 'Smoke','Gun', 'Knife'] #, "Male", "Female"
-# anamoly = ["falling down","jumping","lying","running","hitting an object","kicking","shooting/holding a gun","throwing","fighting/beating","kicking"]
-
-
 batch = []
 frame_cnt = 0
 isolate_queue = {}
-trigger_age = 1
+trigger_age = 50
 
-# cwd = os.getcwd()
-# static_path = join(cwd,'static')
-# ipfs_tempdata_path = join(static_path,'ipfs_data')
 print(ipfs_tempdata_path)
 def conv_path2cid(pathh):
     command = 'ipfs --api={ipfs_url} add {file_path} -Q'.format(file_path=pathh,ipfs_url=ipfs_url)
@@ -158,8 +153,12 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
 
         # for each in output_json['metaData']['object']:
         if len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly])>0 or len([True for each in [each["class"] for each in output_json['metaData']['object']] if each in anamoly_object])>0:
-            print("alarm trigger for activities",)
-            # alarm()
+            if alarm_config == "on":
+                print("alarm trigger for activities")
+                try:
+                    alarm()
+                except:
+                    print("alarm is not connected / couldn't connect to alarm")
             print("Anomoly check cnt:",len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly]))
             
             output_json["type"] = "anomaly"
@@ -216,18 +215,22 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
     global anamoly_object, anamoly
     global frame_cnt
     global trigger_age
-
+    # print("got imgs")
     frame_timestamp = inputt["frame_timestamp"]
     frame_cnt += frame_cnt
     frame_data = []
     bbox_list = []
     bbox_ref_list = []
-    
+
     for objectt in inputt["objects"]:
         if objectt["detect_type"] in anamoly_object and objectt["age"] > trigger_age:
             trigger_age = trigger_age + 1
-            print("Alarm triggered for "+objectt["detect_type"]+" age: "+str(objectt["age"]))
-            # alarm()
+            if alarm_config == "on":
+                print("Alarm triggered for "+objectt["detect_type"]+" age: "+str(objectt["age"]))
+                try:
+                    alarm()
+                except:
+                    print("alarm is not connected / couldn't connect to alarm")
             
         obj_dict = {}
         obj_dict[objectt["obj_id"]] = {}
