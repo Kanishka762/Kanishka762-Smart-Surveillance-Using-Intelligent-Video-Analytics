@@ -9,7 +9,9 @@ import threading
 
 from modules.db.db_push import gst_hls_push
 from modules.db.db_fetch_devices import filter_devices
-
+from modules.face_recognition_pack.lmdb_components import load_lmdb_list
+from modules.db.db_fetch_members import fetch_db_mem
+from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
 # cwd = os.getcwd()
 # data_path = join(cwd, 'data')
 # dotenv_path = join(data_path, '.env')
@@ -18,13 +20,14 @@ load_dotenv(dotenv_path)
 rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
 
 def create_device_dict():
-    # sys.exit(main(sys.argv))
     # load_lmdb_list()
     # print("removed lmdb contents")
     # mem_data = fetch_db_mem()
     # print(mem_data)
     # load_lmdb_fst(mem_data)
     # load_lmdb_list()
+
+    # return True
 
     device_det = filter_devices()
     dev_details = [""]
@@ -47,7 +50,7 @@ def create_device_dict():
         device_dict["lat"] = chunk[11]
         device_dict["long"] = chunk[12]
         dev_details.append(device_dict)
-        # if i == 3:
-        #     break
+        if i == 1:
+            break
     threading.Thread(target=gst_hls_push,args=(dev_details,)).start()
     return dev_details
