@@ -60,6 +60,9 @@ from modules.gif.gif_creation import gif_build
 from modules.db.db_push import gif_push, gst_hls_push
 from modules.components.generate_crop import save_one_box
 from modules.data_process.frame_data_process import frame_2_dict
+from modules.face_recognition_pack.lmdb_list_gen import attendance_lmdb_known, attendance_lmdb_unknown
+
+# from modules.face_recognition_pack.lmdb_components import known_whitelist_faces,known_whitelist_id,known_blacklist_faces,known_blacklist_id
 
 load_dotenv(dotenv_path)
 
@@ -106,9 +109,23 @@ pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
 # gif_path = join(static_path, 'Gif_output')
 # hls_path = join(static_path, 'Hls_output')
 
+known_whitelist_faces = []
+known_whitelist_id = []
+known_blacklist_faces = []
+known_blacklist_id = []
 
-
-
+def load_lmdb_list():
+    known_whitelist_faces1, known_whitelist_id1 = attendance_lmdb_known()
+    known_blacklist_faces1, known_blacklist_id1 = attendance_lmdb_unknown()
+    global known_whitelist_faces
+    known_whitelist_faces = known_whitelist_faces1
+    global known_whitelist_id
+    known_whitelist_id = known_whitelist_id1
+    global known_blacklist_faces
+    known_blacklist_faces = known_blacklist_faces1
+    global known_blacklist_id
+    known_blacklist_id = known_blacklist_id1
+    # print("in ",known_whitelist_id,known_blacklist_id)
 
 
 def draw_bounding_boxes(image, obj_meta, confidence):
@@ -157,7 +174,7 @@ def crop_object(image, obj_meta):
     return crop
 
 def tracker_src_pad_buffer_probe(pad,info,u_data):
-    global gif_dict
+    global gif_dict,known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id
 
     frame_number=0
     #Intiallizing object counter with 0.
@@ -359,9 +376,10 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
                 frame_dict['np_arr'] = frame_copy
                 frame_dict['org_frame'] = n_frame
 
-            # datainfo = [known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id]       
-            datainfo = [[],[],[],[]]
+            datainfo = [known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id]       
+            # datainfo = [[],[],[],[]]
             # print(frame_dict)
+            # print(datainfo)
             frame_2_dict(frame_dict,dev_id_dict,datainfo)
             # frame_dict.clear()
             if is_aarch64():
@@ -380,9 +398,9 @@ def start_deepstream(args):
     global dev_id_dict
     # Check input arguments
     past_tracking_meta[0]=1
-    if len(args) < 2:
-        sys.stderr.write("usage: %s <uri1> [uri2] ... [uriN]\n" % args[0])
-        sys.exit(1)
+    # if len(args) < 2:
+    #     sys.stderr.write("usage: %s <uri1> [uri2] ... [uriN]\n" % args[0])
+    #     sys.exit(1)
     number_sources=len(args)-1
     print(number_sources)
 
