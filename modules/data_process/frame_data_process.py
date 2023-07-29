@@ -171,7 +171,7 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
             if(status == "SUCCESS!!"):
                 asyncio.run(json_publish_activity(primary=output_json))
                 print("DB insertion successful :)")
-                # face_recognition_process(output_json_fr,datainfo,device_id)
+                face_recognition_process(output_json_fr,datainfo,device_id)
                 #did,track_type = find_person_type(objectt["crop"], datainfo)
 
                 with open("./static/test.json", "a") as outfile:
@@ -186,7 +186,7 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
             status = dbpush_activities(output_json)
             if(status == "SUCCESS!!"):
                 print("DB insertion successful :)")
-                # face_recognition_process(output_json_fr,datainfo,device_id)
+                face_recognition_process(output_json_fr,datainfo,device_id)
                 with open("./static/test.json", "a") as outfile:
                     json.dump(output_json, outfile)
             elif(status == "FAILURE!!"):
