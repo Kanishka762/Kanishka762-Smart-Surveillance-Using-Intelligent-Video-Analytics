@@ -74,10 +74,6 @@ obj_det_labels = ast.literal_eval(os.getenv("obj_det_labels"))
 timezone = pytz.timezone(f'{place}')  #assign timezone
 config_path = cwd + f"/models_deepstream/{tenant_name}/{device}/config.txt"
 
-
-
-
-
 new = {}
 
 age_dict = {}
@@ -379,7 +375,6 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
             datainfo = [known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id]       
             # datainfo = [[],[],[],[]]
             # print(frame_dict)
-            # print(datainfo)
             frame_2_dict(frame_dict,dev_id_dict,datainfo)
             # frame_dict.clear()
             if is_aarch64():

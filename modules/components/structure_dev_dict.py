@@ -17,14 +17,17 @@ from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
 load_dotenv(dotenv_path)
 
 rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
+subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 
 def create_device_dict():
-    load_lmdb_list()
-    print("removed lmdb contents")
-    mem_data = fetch_db_mem()
-    print(mem_data)
-    load_lmdb_fst(mem_data)
-    load_lmdb_list()
+    
+    if 'Face_Recognition' in subscriptions:
+        load_lmdb_list()
+        print("removed lmdb contents")
+        mem_data = fetch_db_mem()
+        print(mem_data)
+        load_lmdb_fst(mem_data)
+        load_lmdb_list()
     # print(known_blacklist_id)
     # return True
 
@@ -42,15 +45,15 @@ def create_device_dict():
         device_dict["videoEncodingInformation"] = 'H265'
         device_dict["username"] = chunk[7]
         # device_dict["rtsp"] = chunk[8]
-        # device_dict["rtsp"] = rtsp_links[i]
-        device_dict["rtsp"] = "rtsp://happymonk:admin123@streams.ckdr.co.in:4554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
+        device_dict["rtsp"] = rtsp_links[i]
+        # device_dict["rtsp"] = "rtsp://happymonk:admin123@streams.ckdr.co.in:4554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
         device_dict["password"] = chunk[9]
         device_dict["subscriptions"] = chunk[10]
         device_dict["lat"] = chunk[11]
         device_dict["long"] = chunk[12]
         dev_details.append(device_dict)
             
-        if i == 2:
+        if i == 5:
             break    
        
         

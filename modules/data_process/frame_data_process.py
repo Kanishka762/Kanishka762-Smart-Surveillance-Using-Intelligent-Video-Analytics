@@ -45,6 +45,7 @@ alarm_config = os.getenv("alarm_config")
 
 anamoly_object = ast.literal_eval(os.getenv("anamoly_object"))
 anamoly = ast.literal_eval(os.getenv("anamoly"))
+subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 
 
 batch = []
@@ -124,9 +125,11 @@ async def json_publish_activity(primary):
     print("Activity is getting published")
 
 def process_results(device_id,batch_data,device_data,device_timestamp, datainfo, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
-    act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
-    print(act_batch_res)
-    output_json = merge_activity(act_batch_res, output_json)
+    
+    if 'Activity' in subscriptions:
+        act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
+        print(act_batch_res)
+        output_json = merge_activity(act_batch_res, output_json)
 
     if output_json['metaData']['object']:
         # print(output_json)
@@ -171,7 +174,8 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
             if(status == "SUCCESS!!"):
                 asyncio.run(json_publish_activity(primary=output_json))
                 print("DB insertion successful :)")
-                face_recognition_process(output_json_fr,datainfo,device_id)
+                if 'Face_Recognition' in subscriptions:
+                    face_recognition_process(output_json_fr,datainfo,device_id)
                 #did,track_type = find_person_type(objectt["crop"], datainfo)
 
                 with open("./static/test.json", "a") as outfile:
@@ -186,7 +190,8 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
             status = dbpush_activities(output_json)
             if(status == "SUCCESS!!"):
                 print("DB insertion successful :)")
-                face_recognition_process(output_json_fr,datainfo,device_id)
+                if 'Face_Recognition' in subscriptions:
+                    face_recognition_process(output_json_fr,datainfo,device_id)
                 with open("./static/test.json", "a") as outfile:
                     json.dump(output_json, outfile)
             elif(status == "FAILURE!!"):
