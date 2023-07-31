@@ -87,9 +87,9 @@ def face_recognition_process(output_json,datainfo,device_id):
     for detection in output_json['metaData']['object']:
         # image_path = cid_to_image(detection['cids'],device_id)
         crop_image = detection['cids'][0]
-        # print("crop_image",crop_image)
+        # print(crop_image,datainfo)
         did, track_type = find_person_type(crop_image,datainfo)
-        print( did, track_type)
+        # print(did, track_type)
         if did == "":
             did = None
         detection["track"] = track_type
