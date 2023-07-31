@@ -17,14 +17,17 @@ from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
 load_dotenv(dotenv_path)
 
 rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
+subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 
 def create_device_dict():
-    load_lmdb_list()
-    print("removed lmdb contents")
-    mem_data = fetch_db_mem()
-    print(mem_data)
-    load_lmdb_fst(mem_data)
-    load_lmdb_list()
+    
+    if 'Face_Recognition' in subscriptions:
+        load_lmdb_list()
+        print("removed lmdb contents")
+        mem_data = fetch_db_mem()
+        print(mem_data)
+        load_lmdb_fst(mem_data)
+        load_lmdb_list()
     # print(known_blacklist_id)
     # return True
 
