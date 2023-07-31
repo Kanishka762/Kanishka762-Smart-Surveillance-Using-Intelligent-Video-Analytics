@@ -35,6 +35,7 @@ def insert_db(memberId, person_img_bytes, db_):
     return True
 
 def cid_to_image(cid):
+    global image_path
     #'ipfs --api={ipfs_url} add {file_path} -Q'.format(ipfs_url=ipfs_url, file_path=src_file)
     command = 'ipfs --api={ipfs_url} get {cid}'.format(ipfs_url=ipfs_url,cid=cid)
     output = sp.getoutput(command)

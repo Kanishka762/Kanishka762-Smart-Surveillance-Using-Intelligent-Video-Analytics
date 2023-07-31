@@ -56,12 +56,12 @@ import asyncio
 from dotenv import load_dotenv
 
 from modules.gif.gif_creation import gif_build
-from modules.db.db_fetch_members import fetch_db_mem
 from modules.db.db_push import gif_push, gst_hls_push
-from modules.face_recognition_pack.facedatainsert_lmdb import add_member_to_lmdb
-from modules.face_recognition_pack.lmdb_list_gen import attendance_lmdb_known, attendance_lmdb_unknown
 from modules.components.generate_crop import save_one_box
 from modules.data_process.frame_data_process import frame_2_dict
+from modules.face_recognition_pack.lmdb_list_gen import attendance_lmdb_known, attendance_lmdb_unknown
+
+# from modules.face_recognition_pack.lmdb_components import known_whitelist_faces,known_whitelist_id,known_blacklist_faces,known_blacklist_id
 
 load_dotenv(dotenv_path)
 
@@ -69,7 +69,7 @@ device = os.getenv("device")
 tenant_name = os.getenv("tenant_name")
 
 place = os.getenv("place")
-
+obj_det_labels = ast.literal_eval(os.getenv("obj_det_labels"))
 timezone = pytz.timezone(f'{place}')  #assign timezone
 config_path = cwd + f"/models_deepstream/{tenant_name}/{device}/config.txt"
 
@@ -81,12 +81,18 @@ dev_id_dict = {}
 gif_dict = {}
 detect_data = []
 gif_created = {}
-PGIE_CLASS_ID_MALE = 0
-PGIE_CLASS_ID_FEMALE = 1
-PGIE_CLASS_ID_FIRE = 2
-PGIE_CLASS_ID_SMOKE = 3
-PGIE_CLASS_ID_GUN = 4
-PGIE_CLASS_ID_KNIFE = 5
+
+label_dict = {}
+for i,label in enumerate(obj_det_labels):
+    label_dict[label] = i 
+
+# PGIE_CLASS_ID_MALE = 0
+# PGIE_CLASS_ID_FEMALE = 1
+# PGIE_CLASS_ID_FIRE = 2
+# PGIE_CLASS_ID_SMOKE = 3
+# PGIE_CLASS_ID_GUN = 4
+# PGIE_CLASS_ID_KNIFE = 5
+
 past_tracking_meta=[0]
 OSD_PROCESS_MODE= 0
 OSD_DISPLAY_TEXT= 1
@@ -99,29 +105,24 @@ pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
 # gif_path = join(static_path, 'Gif_output')
 # hls_path = join(static_path, 'Hls_output')
 
+known_whitelist_faces = []
+known_whitelist_id = []
+known_blacklist_faces = []
+known_blacklist_id = []
 
 def load_lmdb_list():
     known_whitelist_faces1, known_whitelist_id1 = attendance_lmdb_known()
     known_blacklist_faces1, known_blacklist_id1 = attendance_lmdb_unknown()
-    
     global known_whitelist_faces
     known_whitelist_faces = known_whitelist_faces1
-
     global known_whitelist_id
     known_whitelist_id = known_whitelist_id1
-    
     global known_blacklist_faces
     known_blacklist_faces = known_blacklist_faces1
-
     global known_blacklist_id
     known_blacklist_id = known_blacklist_id1
+    # print("in ",known_whitelist_id,known_blacklist_id)
 
-def load_lmdb_fst(mem_data):
-    i = 0
-    for each in mem_data:
-        i = i+1
-        add_member_to_lmdb(each)
-        print("inserting ",each)
 
 def draw_bounding_boxes(image, obj_meta, confidence):
     confidence = '{0:.2f}'.format(confidence)
@@ -169,19 +170,25 @@ def crop_object(image, obj_meta):
     return crop
 
 def tracker_src_pad_buffer_probe(pad,info,u_data):
-    global gif_dict
+    global gif_dict,known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id
 
     frame_number=0
     #Intiallizing object counter with 0.
-    obj_counter = {
-        PGIE_CLASS_ID_MALE : 0,
-        PGIE_CLASS_ID_FEMALE : 0,
-        PGIE_CLASS_ID_FIRE : 0,
-        PGIE_CLASS_ID_SMOKE : 0,
-        PGIE_CLASS_ID_GUN : 0,
-        PGIE_CLASS_ID_KNIFE : 0
 
-    }
+    obj_counter = {}
+        # PGIE_CLASS_ID_MALE : 0,
+        # PGIE_CLASS_ID_FEMALE : 0,
+        # PGIE_CLASS_ID_FIRE : 0,
+        # PGIE_CLASS_ID_SMOKE : 0,
+        # PGIE_CLASS_ID_GUN : 0,
+        # PGIE_CLASS_ID_KNIFE : 0
+
+    # for label in label_dict:
+    #     obj_counter_label[label] = 0 
+    for label in label_dict:
+        obj_counter[label_dict[label]] = 0 
+    # print(obj_counter)
+
     num_rects=0
     gst_buffer = info.get_buffer()
     if not gst_buffer:
@@ -319,7 +326,20 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
         # memory will not be claimed by the garbage collector.
         # Reading the display_text field here will return the C address of the
         # allocated string. Use pyds.get_string() to get the string content.
-        py_nvosd_text_params.display_text = "Frame Number={} Number of Male={} Female={} Knife ={} Gun={}".format(frame_number, obj_counter[PGIE_CLASS_ID_MALE], obj_counter[PGIE_CLASS_ID_FEMALE], obj_counter[PGIE_CLASS_ID_KNIFE], obj_counter[PGIE_CLASS_ID_GUN])
+
+        display_text_deepstream = "Frame Number={} Number of ".format(frame_number)
+        # print(obj_counter)
+        obj_cnt = [obj_counter[idd] for idd in obj_counter]
+        # print(obj_cnt)
+        # print(label_dict)
+        for label in label_dict:
+            # print(label)
+            display_text_deepstream = display_text_deepstream +label+" = {} "
+        # print(display_text_deepstream.format(*obj_cnt))
+
+
+        # Male={} Female={} Knife ={} Gun={} , obj_counter[PGIE_CLASS_ID_MALE], obj_counter[PGIE_CLASS_ID_FEMALE], obj_counter[PGIE_CLASS_ID_KNIFE], obj_counter[PGIE_CLASS_ID_GUN]
+        py_nvosd_text_params.display_text = display_text_deepstream
 
 
         # Now set the offsets where the string should appear
@@ -352,9 +372,10 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
                 frame_dict['np_arr'] = frame_copy
                 frame_dict['org_frame'] = n_frame
 
-            # datainfo = [known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id]       
-            datainfo = [[],[],[],[]]
+            datainfo = [known_whitelist_faces, known_blacklist_faces, known_whitelist_id, known_blacklist_id]       
+            # datainfo = [[],[],[],[]]
             # print(frame_dict)
+            # print(datainfo)
             frame_2_dict(frame_dict,dev_id_dict,datainfo)
             # frame_dict.clear()
             if is_aarch64():
@@ -453,9 +474,9 @@ def start_deepstream(args):
     global dev_id_dict
     # Check input arguments
     past_tracking_meta[0]=1
-    if len(args) < 2:
-        sys.stderr.write("usage: %s <uri1> [uri2] ... [uriN]\n" % args[0])
-        sys.exit(1)
+    # if len(args) < 2:
+    #     sys.stderr.write("usage: %s <uri1> [uri2] ... [uriN]\n" % args[0])
+    #     sys.exit(1)
     number_sources=len(args)-1
     print(number_sources)
 
