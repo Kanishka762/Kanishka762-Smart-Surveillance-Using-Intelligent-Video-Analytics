@@ -39,9 +39,9 @@ def cid_to_image(cid):
     #'ipfs --api={ipfs_url} add {file_path} -Q'.format(ipfs_url=ipfs_url, file_path=src_file)
     command = 'ipfs --api={ipfs_url} get {cid}'.format(ipfs_url=ipfs_url,cid=cid)
     output = sp.getoutput(command)
-    image_path = image_path+str(cid)+".jpg"
-    os.rename(cid, image_path)
-    return image_path
+    im_path = image_path+'/'+str(cid)+".jpg"
+    os.rename(cid, im_path)
+    return im_path
 
 def add_member_to_lmdb(MemberPublish):
     list_of_members =  MemberPublish["member"]

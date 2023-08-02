@@ -41,17 +41,17 @@ def create_device_dict():
         device_dict["port"] = chunk[5]
         device_dict["videoEncodingInformation"] = 'H265'
         device_dict["username"] = chunk[7]
-        # device_dict["rtsp"] = chunk[8]
+        device_dict["rtsp"] = chunk[8]
         # device_dict["rtsp"] = rtsp_links[i]
-        device_dict["rtsp"] = "rtsp://happymonk:admin123@streams.ckdr.co.in:4554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
+        # device_dict["rtsp"] = "rtsp://happymonk:admin123@streams.ckdr.co.in:4554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
         device_dict["password"] = chunk[9]
         device_dict["subscriptions"] = chunk[10]
         device_dict["lat"] = chunk[11]
         device_dict["long"] = chunk[12]
         dev_details.append(device_dict)
             
-        if i == 2:
-            break    
+        # if i == 2:
+        #     break    
        
         
     threading.Thread(target=gst_hls_push,args=(dev_details,)).start()

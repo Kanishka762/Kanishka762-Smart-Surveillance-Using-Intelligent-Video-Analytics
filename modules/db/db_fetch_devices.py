@@ -36,7 +36,7 @@ def fetch_db():
                 INNER JOIN "DeviceFeatures" devfeat ON dev."deviceId" = devfeat."deviceId" AND devfeat.enabled = True
                 INNER JOIN "Features" feat ON devfeat."featureId" = feat.id
                 INNER JOIN "Geo" ge ON ge."deviceMetaDataId" = metadev.id
-                WHERE dev.id IS NOT NULL AND dev."tenantId" IS NOT NULL AND dev."remoteUsername" IS NOT NULL AND dev."remoteDeviceSalt" IS NOT NULL
+                WHERE dev.id IS NOT NULL AND dev."tenantId" IS NOT NULL AND dev."remoteUsername" IS NOT NULL AND dev."remoteDeviceSalt" IS NOT NULL AND dev.deleted = False
                 GROUP BY dev.id, dev."tenantId", metadev.urn, metadev.ddns, metadev.ip, metadev.port, metadev."videoEncodingInformation", dev."remoteUsername", metadev.rtsp, dev."remoteDeviceSalt", ge.latitude, ge.longitude;
             ;'''
         cursor.execute(query)
