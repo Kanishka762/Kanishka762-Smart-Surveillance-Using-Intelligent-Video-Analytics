@@ -53,9 +53,8 @@ def create_device_dict():
         device_dict["long"] = chunk[12]
         dev_details.append(device_dict)
             
-        # if i == 2:
+        # if i == 0:
         #     break    
        
-        
     threading.Thread(target=gst_hls_push,args=(dev_details,)).start()
     return dev_details

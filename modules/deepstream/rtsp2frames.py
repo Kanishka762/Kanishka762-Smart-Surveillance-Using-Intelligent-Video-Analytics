@@ -67,14 +67,12 @@ load_dotenv(dotenv_path)
 
 device = os.getenv("device")
 tenant_name = os.getenv("tenant_name")
+ddns_name = os.getenv("DDNS_NAME")
 
 place = os.getenv("place")
 obj_det_labels = ast.literal_eval(os.getenv("obj_det_labels"))
 timezone = pytz.timezone(f'{place}')  #assign timezone
 config_path = cwd + f"/models_deepstream/{tenant_name}/{device}/config.txt"
-
-
-
 
 age_dict = {}
 dev_id_dict = {}
@@ -634,7 +632,7 @@ def start_deepstream(args):
 
         DDNS = args[i+1]['ddns']
         if DDNS is None or " ":
-            DDNS = "hls.ckdr.co.in"
+            DDNS = ddns_name
 
         video_info = hls_path + '/' + dev_id_dict[i]['deviceId']
         if not os.path.exists(video_info):
@@ -695,9 +693,11 @@ def start_deepstream(args):
         
         encoder = Gst.ElementFactory.make("nvv4l2h264enc", f"encoder_{i}") # nvv4l2h264enc
         pipeline.add(encoder)
-        encoder.set_property("bitrate", 180000)
+        encoder.set_property("bitrate", 1800000)
         if is_aarch64():
             encoder.set_property("preset-level", "FastPreset")
+        else:
+            encoder.set_property("preset-id", 2)
         container = Gst.ElementFactory.make("mpegtsmux", f"mux_{i}")
         pipeline.add(container)
         if not is_aarch64():
