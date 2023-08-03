@@ -23,6 +23,7 @@ pgdb = os.getenv("pgdb")
 pgport = os.getenv("pgport")
 pguser = os.getenv("pguser")
 pgpassword = os.getenv("pgpassword")
+ddns_env = os.getenv("DDNS_NAME")
 
 def gst_hls_push(deviceInfo):
     
@@ -34,7 +35,7 @@ def gst_hls_push(deviceInfo):
         device_id = item['deviceId']
         ddns_name = item['ddns']
         if(ddns_name == None):
-            hostname = 'streams.ckdr.co.in:82'
+            hostname = ddns_env
         else:
             hostname = ddns_name
             
@@ -54,7 +55,6 @@ def gst_hls_push(deviceInfo):
             cursor.close()
             connection.close()    
             print("Updated the uri column in device table")
-            return
         except psycopg2.errors.SerializationFailure as e:
             # If the transaction encounters a serialization failure, retry with exponential backoff
             print(f"Transaction serialization failure: {e}")
@@ -78,7 +78,6 @@ def gst_hls_push(deviceInfo):
                     cursor.close()
                     connection.close() 
                     print("Transaction succeeded on retry")
-                    return
                 except psycopg2.errors.SerializationFailure as e:
                     print(f"Transaction serialization failure: {e}")
                     connection.rollback()
@@ -174,7 +173,6 @@ def gif_push(file_path, device_info, gifBatch):
         connection.commit()
         cursor.close()
         connection.close()       
-        return
     except psycopg2.errors.SerializationFailure as e:
         # If the transaction encounters a serialization failure, retry with exponential backoff
         print(f"Transaction serialization failure: {e}")
@@ -237,7 +235,6 @@ def gif_push(file_path, device_info, gifBatch):
                 cursor.close()
                 connection.close() 
                 print("Transaction succeeded on retry")
-                return
             except psycopg2.errors.SerializationFailure as e:
                 print(f"Transaction serialization failure: {e}")
                 connection.rollback()
