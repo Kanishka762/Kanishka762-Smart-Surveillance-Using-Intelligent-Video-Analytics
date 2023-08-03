@@ -232,7 +232,7 @@ def tracker_src_pad_buffer_probe(pad,info,u_data):
             if device_id not in gif_created:
                 gif_created[device_id] = False
      
-        # asyncio.run(gif_build(n_frame_copy, dev_id_dict[camera_id], gif_dict, gif_created))
+        asyncio.run(gif_build(n_frame_copy, dev_id_dict[camera_id], gif_dict, gif_created))
         
         num_detect = frame_meta.num_obj_meta
         device_timestamp = datetime.datetime.now(timezone)
