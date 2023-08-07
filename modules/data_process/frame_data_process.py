@@ -156,7 +156,7 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
 
         # for each in output_json['metaData']['object']:
         if len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly])>0 or len([True for each in [each["class"] for each in output_json['metaData']['object']] if each in anamoly_object])>0:
-            if alarm_config == "on":
+            if "alarm" in subscriptions:
                 print("alarm trigger for activities")
                 try:
                     alarm()
@@ -220,7 +220,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
     global anamoly_object, anamoly
     global frame_cnt
     global trigger_age
-    # print("got imgs")
+    print("got imgs")
     frame_timestamp = inputt["frame_timestamp"]
     frame_cnt += frame_cnt
     frame_data = []
@@ -230,7 +230,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
     for objectt in inputt["objects"]:
         if objectt["detect_type"] in anamoly_object and objectt["age"] > trigger_age:
             trigger_age = trigger_age + 1
-            if alarm_config == "on":
+            if "alarm" in subscriptions:
                 print("Alarm triggered for "+objectt["detect_type"]+" age: "+str(objectt["age"]))
                 try:
                     alarm()
