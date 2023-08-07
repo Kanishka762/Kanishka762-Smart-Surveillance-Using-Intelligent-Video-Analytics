@@ -46,7 +46,7 @@ alarm_config = os.getenv("alarm_config")
 anamoly_object = ast.literal_eval(os.getenv("anamoly_object"))
 anamoly = ast.literal_eval(os.getenv("anamoly"))
 subscriptions = ast.literal_eval(os.getenv("subscriptions"))
-
+batch_size = int(os.getenv("batch_size"))
 
 batch = []
 frame_cnt = 0
@@ -270,7 +270,7 @@ def frame_2_dict(inputt, dev_id_dict, datainfo):
         isolate_queue[device_id].append(final_frame)
 
     for each in isolate_queue:
-        if len(isolate_queue[each])>279:
+        if len(isolate_queue[each])>batch_size:
             batch_data = isolate_queue[each]
             isolate_queue[each] = []
             asyncio.run(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp,datainfo))
