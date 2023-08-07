@@ -32,7 +32,7 @@ def create_device_dict():
     # return True
 
     device_det = filter_devices()
-    dev_details = [""]
+    dev_details = []
 
     for i,chunk in enumerate(device_det):
         device_dict = {}

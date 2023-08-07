@@ -499,13 +499,13 @@ def start_deepstream(args):
     pipeline.add(streammux)
     for i in range(number_sources):
         print("Creating source_bin ",i," \n ")
-        uri_name = args[i+1]['rtsp']
+        uri_name = args[i]['rtsp']
         # print("+++++++++++++++")
         # print(uri_name)
         # print("+++++++++++++++")
 
-        # dev_id = args[i+1]['deviceId']
-        dev_id_dict[i] = args[i+1]
+        # dev_id = args[i]['deviceId']
+        dev_id_dict[i] = args[i]
         print(dev_id_dict)
 
         # if uri_name.find("rtsp://") == 0 :
@@ -630,7 +630,7 @@ def start_deepstream(args):
     for i in range(number_sources):
         print("Creating sink ",i," \n ")
 
-        DDNS = args[i+1]['ddns']
+        DDNS = args[i]['ddns']
         if DDNS is None or " ":
             DDNS = ddns_name
 
