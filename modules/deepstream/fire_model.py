@@ -72,7 +72,8 @@ ddns_name = os.getenv("DDNS_NAME")
 place = os.getenv("place")
 obj_det_labels = ast.literal_eval(os.getenv("obj_det_labels"))
 timezone = pytz.timezone(f'{place}')  #assign timezone
-config_path = cwd + f"/models_deepstream/{tenant_name}/{device}/config.txt"
+config_path_pgie = cwd + f"/models_deepstream/{tenant_name}/{device}/config.txt"
+config_path_sgie = cwd + f"/models_deepstream/{tenant_name}/{device}/fire_model/config.txt"
 
 age_dict = {}
 dev_id_dict = {}
@@ -466,7 +467,7 @@ def create_source_bin(index,uri):
 
  ######################################################################
 
-def start_deepstream(args):
+def start_fire_model(args):
     print(args)
     global dev_id_dict
     # Check input arguments
@@ -540,6 +541,12 @@ def start_deepstream(args):
     pgie = Gst.ElementFactory.make("nvinfer", "primary-inference")
     if not pgie:
         sys.stderr.write(" Unable to create pgie \n")
+        
+    print("Creating Sgie \n ")
+    sgie = Gst.ElementFactory.make("nvinfer", "primary-inference-2")
+    if not sgie:
+        sys.stderr.write(" Unable to create sgie \n")
+    
     print("Creating Tracker \n")
     tracker = Gst.ElementFactory.make("nvtracker", "tracker")
     if not tracker:
@@ -589,12 +596,17 @@ def start_deepstream(args):
     streammux.set_property('height', 480)
     streammux.set_property('batch-size', 5)
     streammux.set_property('batched-push-timeout', 40000)
-    pgie.set_property('config-file-path', config_path)
+    pgie.set_property('config-file-path', config_path_pgie)
+    sgie.set_property('config-file-path', config_path_sgie)
     pgie_batch_size=pgie.get_property("batch-size")
     if(pgie_batch_size != number_sources):
         print("WARNING: Overriding infer-config batch-size",pgie_batch_size," with number of sources ", number_sources," \n")
     pgie.set_property("batch-size", number_sources)
     
+    sgie_batch_size=sgie.get_property("batch-size")
+    if(sgie_batch_size != number_sources):
+        print("WARNING: Overriding infer-config batch-size",sgie_batch_size," with number of sources ", number_sources," \n")
+    sgie.set_property("batch-size", number_sources)
 
     # tiler_rows=int(math.sqrt(number_sources))
     # tiler_columns=int(math.ceil((1.0*number_sources)/tiler_rows))
@@ -613,6 +625,7 @@ def start_deepstream(args):
 
     print("Adding elements to Pipeline \n")
     pipeline.add(pgie)
+    pipeline.add(sgie)
     pipeline.add(tracker)
     pipeline.add(nvvidconv)
     pipeline.add(capsfilter0)
@@ -623,7 +636,8 @@ def start_deepstream(args):
     streammux.link(nvvidconv)
     nvvidconv.link(capsfilter0)
     capsfilter0.link(pgie)
-    pgie.link(tracker)
+    pgie.link(sgie)
+    sgie.link(tracker)
     tracker.link(demux)
     
 
