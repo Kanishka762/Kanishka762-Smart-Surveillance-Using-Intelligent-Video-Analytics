@@ -8,7 +8,7 @@ import asyncio
 import threading
 from modules.db.db_push import gst_hls_push
 from modules.db.db_fetch_devices import filter_devices
-from modules.deepstream.rtsp2frames import load_lmdb_list
+from modules.deepstream.person_model import load_lmdb_list
 from modules.db.db_fetch_members import fetch_db_mem
 from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
 # cwd = os.getcwd()
