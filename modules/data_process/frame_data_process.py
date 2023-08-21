@@ -14,7 +14,16 @@ import nats, json
 import numpy as np
 import asyncio
 import threading
+from torch.multiprocessing import Process, set_start_method
+from modules.deepstream.rtsp2frames import framedata_queue
+# lock = threading.Lock()
+semaphore = threading.Semaphore(1)  # Allow 3 threads at a time
+resource = []
 
+try:
+     set_start_method('spawn')
+except RuntimeError:
+    pass
 from modules.alarm.alarm_light_trigger import alarm
 from modules.anomaly.anomaly_score import anamoly_score_calculator, frame_weighted_avg
 from modules.components.batchdata2json import output_func
@@ -45,7 +54,7 @@ alarm_config = os.getenv("alarm_config")
 
 anamoly_object = ast.literal_eval(os.getenv("anamoly_object"))
 anamoly = ast.literal_eval(os.getenv("anamoly"))
-subscriptions = ast.literal_eval(os.getenv("subscriptions"))
+# subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 batch_size = int(os.getenv("batch_size"))
 
 batch = []
@@ -82,34 +91,30 @@ def conv_jsonnumpy_2_jsoncid(primary):
     return primary
 
 
-def face_recognition_process(output_json,datainfo,device_id):
+def face_recognition_process(output_json,device_id):
     print("started face recognition")
     for detection in output_json['metaData']['object']:
-        # image_path = cid_to_image(detection['cids'],device_id)
-        crop_image = detection['cids'][0]
-        # print(crop_image,datainfo)
-        did, track_type = find_person_type(crop_image,datainfo)
-        # print(did, track_type)
+        listOfCrops = detection['cropsNumpyList']
+        did, track_type = find_person_type(listOfCrops)
         if did == "":
             did = None
         detection["track"] = track_type
         detection['memDID'] = did
+        
+        del detection['cropsNumpyList']
     output_json = conv_jsonnumpy_2_jsoncid(output_json)
     print("\n")
     print(f'FACE OUTPUT: {output_json}')
     with open("./static/test.json", "a") as outfile:
         json.dump(output_json, outfile)
+    dbpush_members(output_json)
 
 
 def merge_activity(act_batch_res, output_json):
     if len(output_json['metaData']['object'])>0:
         for obj in output_json['metaData']['object']:
             if int(obj["id"]) in act_batch_res:
-                # print(act_batch_res)
-                # print(act_batch_res[obj["id"]])
                 obj["activity"] = act_batch_res[int(obj["id"])]
-            # else:
-            #     obj["activity"] = None
     return output_json
 
 async def json_publish_activity(primary):
@@ -123,8 +128,11 @@ async def json_publish_activity(primary):
     print(" ")
     print(f'Ack: stream={ack.stream}, sequence={ack.seq}')
     print("Activity is getting published")
+    # await asyncio.tim
 
-def process_results(device_id,batch_data,device_data,device_timestamp, datainfo, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
+async def process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
+    
+    subscriptions = device_data[device_id]["subscriptions"]
     
     if 'Activity' in subscriptions:
         act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
@@ -156,7 +164,7 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
 
         # for each in output_json['metaData']['object']:
         if len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly])>0 or len([True for each in [each["class"] for each in output_json['metaData']['object']] if each in anamoly_object])>0:
-            if "alarm" in subscriptions:
+            if "Alarm" in subscriptions:
                 print("alarm trigger for activities")
                 try:
                     alarm()
@@ -166,39 +174,65 @@ def process_results(device_id,batch_data,device_data,device_timestamp, datainfo,
             
             output_json["type"] = "anomaly"
             output_json_fr = copy.deepcopy(output_json)
-            output_json = conv_jsonnumpy_2_jsoncid(output_json)
-            print("THE OUTPUT JSON STRUCTURE: ",output_json)
-
-            status = dbpush_activities(output_json)
             
-            if(status == "SUCCESS!!"):
-                asyncio.run(json_publish_activity(primary=output_json))
-                print("DB insertion successful :)")
-                if 'Face_Recognition' in subscriptions:
-                    face_recognition_process(output_json_fr,datainfo,device_id)
-                #did,track_type = find_person_type(objectt["crop"], datainfo)
+            if 'Bagdogra' not in subscriptions:
+                # add if sub has data process 
+                output_json = conv_jsonnumpy_2_jsoncid(output_json)
+                # add if sub has data process 
 
-                with open("./static/test.json", "a") as outfile:
-                    json.dump(output_json, outfile)
-            elif(status == "FAILURE!!"):
-                print("DB insertion got failed :(")
+            for detection in output_json['metaData']['object']:
+                del detection['cropsNumpyList']
+                
+            # print("THE OUTPUT JSON STRUCTURE: ",output_json)
+            
+            if 'Bagdogra' not in subscriptions:
+                status = dbpush_activities(output_json)
+                if(status == "SUCCESS!!"):
+                    # add if sub has data process
+                    publish_status = asyncio.run(json_publish_activity(primary=output_json))
+                    await publish_status
+                    print("DB insertion successful :)")
+                    if 'Facial-Recognition' in subscriptions:
+                        face_recognition_process(output_json_fr,device_id)
+                        # asyncio.create_task(face_recognition_process(output_json_fr,device_id))
+                        # threading.Thread(target = face_recognition_process,args = (output_json_fr,device_id,)).start()
+                    #did,track_type = find_person_type(objectt["crop"])
+
+                    # with open("./static/test.json", "a") as outfile:
+                    #     json.dump(output_json, outfile)
+                elif(status == "FAILURE!!"):
+                    print("DB insertion got failed :(")
         else:
             output_json_fr = copy.deepcopy(output_json)
             output_json = conv_jsonnumpy_2_jsoncid(output_json)
-            print("THE OUTPUT JSON STRUCTURE: ",output_json)
+            # add if sub has data process 
+            for detection in output_json['metaData']['object']:
+                del detection['cropsNumpyList']
+            # print("THE OUTPUT JSON STRUCTURE: ",output_json)
             
-            status = dbpush_activities(output_json)
-            if(status == "SUCCESS!!"):
-                print("DB insertion successful :)")
-                if 'Face_Recognition' in subscriptions:
-                    face_recognition_process(output_json_fr,datainfo,device_id)
-                with open("./static/test.json", "a") as outfile:
-                    json.dump(output_json, outfile)
-            elif(status == "FAILURE!!"):
-                print("DB insertion got failed :(")   
+            if 'Bagdogra' not in subscriptions:
+                status = dbpush_activities(output_json)
+                if(status == "SUCCESS!!"):
+                    print("DB insertion successful :)")
+                    if 'Facial-Recognition' in subscriptions:
+                        face_recognition_process(output_json_fr,device_id)
+                        # asyncio.create_task(face_recognition_process(output_json_fr,device_id))
+                        # threading.Thread(target = face_recognition_process,args = (output_json_fr,device_id,)).start()
+                    # with open("./static/test.json", "a") as outfile:
+                    #     json.dump(output_json, outfile)
+                elif(status == "FAILURE!!"):
+                    print("DB insertion got failed :(")   
+
+    await asyncio.sleep(0)
 
 
-async def process_publish(device_id,batch_data,device_data,device_timestamp, datainfo):
+async def process_publish(device_id,batch_data,device_data,device_timestamp):
+    # print("threading.activeCount",threading.activeCount())
+
+    # with semaphore:
+    #     print("threading.activeCount inside semaphore",threading.activeCount())
+
+    print("entering process_publish")
     global anamoly_object, anamoly
     device_id_new = device_data[device_id]["deviceId"]
     detectss = 0
@@ -212,68 +246,115 @@ async def process_publish(device_id,batch_data,device_data,device_timestamp, dat
     bbox_tensor_lst = [frame_data["bbox_tensor"] for frame_data in batch_data]
     org_frames_lst = [frame_data["org_frame"] for frame_data in batch_data]
     obj_id_ref = [frame_data["bbox_ref_list"] for frame_data in batch_data]
+    # output_func(batch_data,device_id,device_timestamp)
     output_json = output_func(batch_data,device_id,device_timestamp)
-    threading.Thread(target = process_results, args = (device_id,batch_data,device_data,device_timestamp, datainfo, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame,)).start()
+    # print(output_json)
+    # print(output_json)
+    # process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame)
+    # threading.Thread(target = process_results, args = (device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame,)).start()
+    # p = Process(target = process_results, args = (device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame,))
+    # p.start()
+    # p.join()
+    # process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame)
+    inference_task = asyncio.create_task(process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame))
+    await inference_task
+async def intermediate(device_id,batch_data,dev_id_dict, frame_timestamp):
+    print("got imgs")
+    process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
+    # threading.Thread(target = process_publish,args = (device_id,batch_data,dev_id_dict, frame_timestamp,)).start()
 
-
-def frame_2_dict(inputt, dev_id_dict, datainfo):
-    global anamoly_object, anamoly
-    global frame_cnt
-    global trigger_age
-    # print("got imgs")
-    frame_timestamp = inputt["frame_timestamp"]
-    frame_cnt += frame_cnt
-    frame_data = []
-    bbox_list = []
-    bbox_ref_list = []
-
-    for objectt in inputt["objects"]:
-        if objectt["detect_type"] in anamoly_object and objectt["age"] > trigger_age:
-            trigger_age = trigger_age + 1
-            if "alarm" in subscriptions:
-                print("Alarm triggered for "+objectt["detect_type"]+" age: "+str(objectt["age"]))
-                try:
-                    alarm()
-                except:
-                    print("alarm is not connected / couldn't connect to alarm")
+def frame_2_dict():
+    while True:
+        try:
+            # print("got inputs")
+            inputt, dev_id_dict = framedata_queue.get()
+            # with lock:
+            # print(dev_id_dict)
+            global anamoly_object, anamoly
+            global frame_cnt
+            global trigger_age
             
-        obj_dict = {}
-        obj_dict[objectt["obj_id"]] = {}
-        obj_dict[objectt["obj_id"]]["type"] = objectt["detect_type"]
-        obj_dict[objectt["obj_id"]]["activity"] = "No Activity"
-        obj_dict[objectt["obj_id"]]["confidence"] = objectt["confidence_score"]
-        obj_dict[objectt["obj_id"]]["did"] = None
-        obj_dict[objectt["obj_id"]]["track_type"] = None
-        obj_dict[objectt["obj_id"]]["age"] = objectt["age"]
-        obj_dict[objectt["obj_id"]]["crops"] = [objectt["crop"]]
-        frame_data.append(obj_dict)
-        
-        if(objectt["detect_type"] == "Male" or objectt["detect_type"] == "Female"):
-            bbox_coord = [objectt["bbox_left"], objectt["bbox_top"], objectt["bbox_right"], objectt["bbox_bottom"]]
-            bbox_ref_list.append(objectt["obj_id"])
-            bbox_list.append(bbox_coord)
+            device_id = inputt["camera_id"]
+            
+            subscriptions = dev_id_dict[device_id]["subscriptions"]
 
-    bbox_np = np.array(bbox_list, dtype=np.float32)
-    bbox_array = np.reshape(bbox_np, (-1, 4))      
-    frame_info_anamoly = anamoly_score_calculator(frame_data)
-    frame_data.clear()
-    frame_anamoly_wgt = frame_weighted_avg(frame_info_anamoly)
+            # face_flag = False
+            
+            # for objj in inputt["objects"]:
+            #     if objj["detect_type"] == "nomask":
+            #         print(inputt)
+            #         face_id = str(objj["obj_id"])
+            #         face_flag = True
+            #         cv2.imwrite("/home/srihari/deepstreambackend/testing_ids/"+str(objj["obj_id"])+"_"+"face.jpg",objj["crop"])
+            # if face_flag:
+            #     for objj in inputt["objects"]:
+            #         if objj["detect_type"] == "Male" or objj["detect_type"] == "Female":
+            #             cv2.imwrite("/home/srihari/deepstreambackend/testing_ids/"+str(objj["obj_id"])+"_"+"body.jpg",objj["crop"])
 
-    cidd = [inputt["np_arr"]]
-    final_frame = {"frame_id":inputt["frame_number"],"frame_anamoly_wgt":frame_anamoly_wgt,"detection_info":frame_info_anamoly,"cid":cidd, "bbox_tensor":bbox_array, "org_frame":inputt["org_frame"], "bbox_ref_list":bbox_ref_list, "total_detects":inputt["total_detect"], "det_frame":cidd}
+                    
+            frame_timestamp = inputt["frame_timestamp"]
+            frame_cnt += frame_cnt
+            frame_data = []
+            bbox_list = []
+            bbox_ref_list = []
 
-    device_id = inputt["camera_id"]
-    if device_id in isolate_queue:
-        isolate_queue[device_id].append(final_frame)
-    else:
-        isolate_queue[device_id] = []
-        isolate_queue[device_id].append(final_frame)
+            for objectt in inputt["objects"]:
+                if "Alarm" in subscriptions:
+                    if objectt["detect_type"] in anamoly_object and objectt["age"] > trigger_age:
+                        trigger_age = trigger_age + 1
+                        
+                        print("Alarm triggered for "+objectt["detect_type"]+" age: "+str(objectt["age"]))
+                        try:
+                            alarm()
+                        except:
+                            print("alarm is not connected / couldn't connect to alarm")
+                    
+                obj_dict = {}
+                obj_dict[objectt["obj_id"]] = {}
+                obj_dict[objectt["obj_id"]]["type"] = objectt["detect_type"]
+                obj_dict[objectt["obj_id"]]["activity"] = "No Activity"
+                obj_dict[objectt["obj_id"]]["confidence"] = objectt["confidence_score"]
+                obj_dict[objectt["obj_id"]]["did"] = None
+                obj_dict[objectt["obj_id"]]["track_type"] = None
+                # obj_dict[objectt["obj_id"]]["age"] = objectt["age"]
+                obj_dict[objectt["obj_id"]]["crops"] = [objectt["crop"]]
+                frame_data.append(obj_dict)
+                
+                if(objectt["detect_type"] == "Male" or objectt["detect_type"] == "Female"):
+                    bbox_coord = [objectt["bbox_left"], objectt["bbox_top"], objectt["bbox_right"], objectt["bbox_bottom"]]
+                    bbox_ref_list.append(objectt["obj_id"])
+                    bbox_list.append(bbox_coord)
 
-    for each in isolate_queue:
-        if len(isolate_queue[each])>batch_size:
-            batch_data = isolate_queue[each]
-            isolate_queue[each] = []
-            asyncio.run(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp,datainfo))
+            bbox_np = np.array(bbox_list, dtype=np.float32)
+            bbox_array = np.reshape(bbox_np, (-1, 4))      
+            frame_info_anamoly = anamoly_score_calculator(frame_data)
+            frame_data.clear()
+            frame_anamoly_wgt = frame_weighted_avg(frame_info_anamoly)
+
+            cidd = [inputt["np_arr"]]
+            final_frame = {"frame_id":inputt["frame_number"],"frame_anamoly_wgt":frame_anamoly_wgt,"detection_info":frame_info_anamoly,"cid":cidd, "bbox_tensor":bbox_array, "org_frame":inputt["org_frame"], "bbox_ref_list":bbox_ref_list, "total_detects":inputt["total_detect"], "det_frame":cidd}
+
+            if device_id in isolate_queue:
+                isolate_queue[device_id].append(final_frame)
+            else:
+                isolate_queue[device_id] = []
+                isolate_queue[device_id].append(final_frame)
+
+            for each in isolate_queue:
+                # print(len(isolate_queue[each]))
+                # print("len(isolate_queue[each])",len(isolate_queue[each]))
+                if len(isolate_queue[each])>batch_size:
+                    batch_data = isolate_queue[each]
+                    isolate_queue[each] = []
+                    # intermediate(device_id,batch_data,dev_id_dict, frame_timestamp)
+                    asyncio.run(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp))
+                    # process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
+                    # asyncio.create_task(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp))
+        except Exception as e:
+            print(e)
+
+
+                    
 
 
 

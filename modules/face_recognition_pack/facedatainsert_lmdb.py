@@ -20,8 +20,10 @@ ipfs_url = os.getenv("ipfs")
 env = lmdb.open(lmdb_path+'/face-detection.lmdb',
                 max_dbs=10, map_size=int(100e9))
 
-known_db = env.open_db(b'white_list')
-unknown_db = env.open_db(b'black_list')
+whitelist_db = env.open_db(b'white_list')
+blacklist_db = env.open_db(b'black_list')
+unknown_db = env.open_db(b'unknown')
+
 
 def conv_img2bytes(image_path):
     image  = cv2.imread(image_path)
@@ -56,17 +58,28 @@ def add_member_to_lmdb(MemberPublish):
         image_path = cid_to_image(faceCID[0])
         print(image_path)
         person_img_bytes = conv_img2bytes(image_path)
+        insertFlag = False
+        
         if class_type == "known":
-            db_ = known_db
-            print("known_db")
-        else:
-            db_ = unknown_db
-            print("unknown_db")
+            insertFlag = True
+            db_ = whitelist_db
+            print("whitelist_db")
 
-        status  = insert_db(memberId, person_img_bytes, db_)
-        print("inserted",status)
-        print("_______________________________________")
-        return status
+        if class_type == "blacklist":
+            insertFlag = True
+            db_ = blacklist_db
+            print("blacklist_db")
+
+        # if class_type == "unknown":
+        #     insertFlag = True
+        #     db_ = unknown_db
+        #     print("unknown_db")
+
+        if insertFlag:
+            status  = insert_db(memberId, person_img_bytes, db_)
+            print("inserted",status)
+            print("_______________________________________")
+            return status
 
 # # #get json from nats and call add_member_to_lmdb(nats_json)
 # MemberPublish = {'id': 'ui75LlKf6gzrfa7LuU2y27Jaq1nxO2nc', 'member': [{'memberId': 'did:ckdr:poigfJXJH4z2WkOjhANmdf8mYUoIz7+6q9/1Gkr6y0KnFA==', 'type': 'unknown', 'faceCID': ['QmQcfk8NL5hqW5mtiNKjZNw98vgU5YswVSioyXLjvj34qy'], 'role': 'admin'}]}
