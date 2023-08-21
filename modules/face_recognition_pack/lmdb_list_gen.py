@@ -9,11 +9,12 @@ import face_recognition
 import os
 from os.path import join, dirname
 
-known_blacklist_faces = []
-known_blacklist_id = []
-known_whitelist_faces = []
-known_whitelist_id = []
-
+blacklist_faces = []
+blacklist_ids = []
+whitelist_faces = []
+whitelist_ids = []
+unknown_faces = []
+unknown_ids = []
 
 # cwd = os.getcwd()
 # static_path = join(cwd, 'static')
@@ -25,22 +26,20 @@ env = lmdb.open(lmdb_path+'/face-detection.lmdb',
 
 
 # Now create subdbs for known and unknown people.
-known_db = env.open_db(b'white_list')
-unknown_db = env.open_db(b'black_list')
+whitelist_db = env.open_db(b'white_list')
+blacklist_db = env.open_db(b'black_list')
+unknown_db = env.open_db(b'unknown')
 
-
-
-def attendance_lmdb_known():
+def insertWhitelistDb():
     # begin = time.time()
-    known_whitelist_faces = []
     with env.begin() as txn:
-        list1 = list(txn.cursor(db=known_db))
+        list1 = list(txn.cursor(db=whitelist_db))
         
     db_count_whitelist = 0
     for key, value in list1:
         #fetch from lmdb
         with env.begin() as txn:
-            re_image = txn.get(key, db=known_db)
+            re_image = txn.get(key, db=whitelist_db)
             
             finalNumpyArray = np.array(Image.open(io.BytesIO(re_image))) 
             image = finalNumpyArray
@@ -48,26 +47,54 @@ def attendance_lmdb_known():
                 encoding = face_recognition.face_encodings(image)[0]
             except IndexError as e  :
                 continue
-            known_whitelist_faces.append(encoding)
-            known_whitelist_id.append(key.decode())
+            whitelist_faces.append(encoding)
+            whitelist_ids.append(key.decode())
             db_count_whitelist += 1
             
     # end = time.time()
 
     # print(f"Total runtime of the program is {end - begin}")
-    # print(known_whitelist_faces)
+    # print(whitelist_faces)
     print(db_count_whitelist, "total whitelist person")
-    return known_whitelist_faces, known_whitelist_id
+    return whitelist_faces, whitelist_ids
 
 
 
-def attendance_lmdb_unknown():
+def insertBlacklistDb():
     # begin = time.time()
-    known_blacklist_faces = []
+    with env.begin() as txn:
+        list1 = list(txn.cursor(db=blacklist_db))
+        
+    db_count_blacklist = 0
+    for key, value in list1:
+        #fetch from lmdb
+        with env.begin() as txn:
+            re_image = txn.get(key, db=blacklist_db)
+            
+            finalNumpyArray = np.array(Image.open(io.BytesIO(re_image))) 
+            image = finalNumpyArray
+            try :
+                encoding = face_recognition.face_encodings(image)[0]
+            except IndexError as e  :
+                continue
+            blacklist_faces.append(encoding)
+            blacklist_ids.append(key.decode())
+            db_count_blacklist += 1
+            
+    # end = time.time()
+    # print(blacklist_faces)
+    # print(f"Total runtime of the program is {end - begin}")
+    print(db_count_blacklist, "total blacklist person")
+    return blacklist_faces,blacklist_ids
+
+
+
+def insertUnknownDb():
+    # begin = time.time()
     with env.begin() as txn:
         list1 = list(txn.cursor(db=unknown_db))
         
-    db_count_blacklist = 0
+    db_count_unknown = 0
     for key, value in list1:
         #fetch from lmdb
         with env.begin() as txn:
@@ -79,12 +106,12 @@ def attendance_lmdb_unknown():
                 encoding = face_recognition.face_encodings(image)[0]
             except IndexError as e  :
                 continue
-            known_blacklist_faces.append(encoding)
-            known_blacklist_id.append(key.decode())
-            db_count_blacklist += 1
+            unknown_faces.append(encoding)
+            unknown_ids.append(key.decode())
+            db_count_unknown += 1
             
     # end = time.time()
-    # print(known_blacklist_faces)
+    # print(blacklist_faces)
     # print(f"Total runtime of the program is {end - begin}")
-    print(db_count_blacklist, "total blacklist person")
-    return known_blacklist_faces,known_blacklist_id
+    print(db_count_unknown, "total unknown person")
+    return unknown_faces,unknown_ids

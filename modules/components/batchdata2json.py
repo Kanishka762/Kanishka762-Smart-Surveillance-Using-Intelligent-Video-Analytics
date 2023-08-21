@@ -14,68 +14,44 @@ import subprocess as sp
 from pytz import timezone
 import time
 from datetime import datetime
+import numpy as np
+collectionCnt = 30
 
-# my_list = [{'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'standing', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{7: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}, {'frame_id': 0, 'frame_anamoly_wgt': 5.0, 'detection_info': [{15: {'type': 'Person', 'activity': 'walking', 'confidence': 0, 'did': 'testing', 'track_type': '100', 'crops': 'testing', 'anamoly_score': 5.0, 'activity_score': 10}}], 'cid': 'testing'}]
-# print(my_list)
-
-# cwd = os.getcwd()
-# data_path = join(cwd, 'data')
-# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
 
 global id
-def most_frequent_func(lst):
-    if len(list(set(lst))) == 1:
-        res = lst[0]
+
+
+def select_elements_with_equal_intervals(input_list, collectionCnt):
+    if len(input_list)>collectionCnt:
+        idx = np.round(np.linspace(0, len(input_list) - 1, collectionCnt)).astype(int)
+        return [input_list[i] for i in idx]
     else:
-        counts = {}
-        for item in lst:
-            if item in counts:
-                counts[item] += 1
-            else:
-                counts[item] = 1
-        sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)
-        most_frequent = sorted_counts[0][0]
-        second_most_frequent = sorted_counts[1][0]
-        if most_frequent == '':
-            res =  second_most_frequent
-        else:
-            res =  most_frequent
-    return res
+        return input_list
 
-def conv_path2cid(pathh):
-    command = 'ipfs --api={ipfs_url} add {file_path} -Q'.format(file_path=pathh,ipfs_url=ipfs_url)
-    output = sp.getoutput(command)
-    return output
-
-def padding_img(path, frame):
-    # # Set target size
-    # width, height = 640, 360
-
-    # # Load image
-    # img = frame
-    # # Get current size
-    # h, w, _ = img.shape
-
-    # # Calculate padding
-    # top = bottom = (height - h) // 2
-    # left = right = (width - w) // 2
-    # top, left,right,bottom = abs(top), abs(left),abs(right),abs(bottom)
-
-    # # Add black padding
-    # color = [0, 0, 0] # Black
-    # img_padded = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT,value=color)
-
-    # # Resize image
-    # img_resized = cv2.resize(img_padded, (width, height))
-
-    # # Save image
-    cv2.imwrite(path, frame)
-    
+def generateCropList(listOfFrames):
+    cropListDict = {}
+    finalCropListDict = {}
+    for frame in listOfFrames:
+        for objectdict in frame['detection_info']:
+            for trackId in objectdict:
+                if trackId in cropListDict:
+                    cropListDict[trackId].append(objectdict[trackId]['crops'])
+                else:
+                    cropListDict[trackId] = []
+                    cropListDict[trackId].append(objectdict[trackId]['crops'])
+    print([{each:len(cropListDict[each])} for each in cropListDict])
+    for trackId in cropListDict:
+        selectedList = select_elements_with_equal_intervals(cropListDict[trackId], collectionCnt)
+        finalCropListDict[trackId] = selectedList
+    print([{each:len(finalCropListDict[each])} for each in finalCropListDict])
+    return finalCropListDict
 
 def output_func(my_list,device_id,device_timestamp):
+    # print(my_list[0]['detection_info'])
+    cropListDict = generateCropList(my_list)
     my_list = [d for d in my_list if d['detection_info'] is not None]
     my_list = [my_list]
     frames=[]               # this variable will hold the frame_id of all the frames in which a atleast one detection was made"
@@ -244,7 +220,8 @@ def output_func(my_list,device_id,device_timestamp):
                                 "memDID" : memDID,
                                 "activity": act,
                                 "detectTime" : "",
-                                "cids": c_id
+                                "cids": c_id,
+                                "cropsNumpyList":cropListDict[re_id]
                             } 
                     temp_list.append(temp)            
     
@@ -336,3 +313,20 @@ def output_func(my_list,device_id,device_timestamp):
 
     return primary
 
+
+
+
+
+
+#import the .env list of subscriptions
+#write a if condition for DB
+#if that condition satisfies
+    #import statements for DB
+
+#write a if condition for activity
+#if that condition satisfies
+    #import statements for activity model
+
+#write a if condition for obj detection
+#if that condition satisfies
+    #import statements for obj detection model

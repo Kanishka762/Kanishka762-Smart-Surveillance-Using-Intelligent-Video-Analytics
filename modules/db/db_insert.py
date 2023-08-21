@@ -192,12 +192,13 @@ def dbpush_members(mem_out):
                 
         for item in mem_out['metaData']['object']:
             # if((item['track'] is not None) and (item['memDID'] is not None)):
-            if((item['track'] == "100") and (item['memDID'] == None)):
+            if((item['track'] == "10") and (item['memDID'] is not None)):
                 type_track = track_type[item['track']]
-                if(item['track'] == "01"):
-                    is_blacklist = True
-                else:
-                    is_blacklist = False
+                is_blacklist = False
+                # if(item['track'] == "01"):
+                #     is_blacklist = True
+                # else:
+                #     is_blacklist = False
                 query = """
                         WITH inserted_member AS (
                         INSERT INTO "Member" (id, type, "tenantId", track, "blackListed", faceid, "createdAt", "updatedAt")
@@ -206,7 +207,7 @@ def dbpush_members(mem_out):
                         ),
                         inserted_tags AS (
                         INSERT INTO "Tags" (id, "tenantId", name, active, "memberId", "deviceId", "taggableType", "createdAt", "updatedAt")
-                        VALUES (uuid_generate_v4(), %(tenantId)s, %(type)s, %(active)s, (SELECT id FROM inserted_member), %(deviceId)s, %(taggableType)s, NOW(), NOW())
+                        VALUES (uuid_generate_v4(), %(tenantId)s, %(type)s, %(active)s, (SELECT id FROM inserted_member), %(deviceId)s, %(taggableType)s,   , NOW())
                         RETURNING id
                         ),
                         inserted_member_tags AS (
@@ -286,3 +287,4 @@ def dbpush_members(mem_out):
 
 # mem_dict = {'type': 'activity', 'deviceid': 'daf2a1b9-a5c7-47f0-a57c-e941f47b670a', 'batchid': 'bf72ff47-d794-4a17-aaad-f3a6733f03b1', 'timestamp': '2023-06-19 10:37:20.284136+05:30', 'geo': {'latitude': 26.25, 'longitude': 88.11}, 'metaData': {'detect': 1, 'frameAnomalyScore': 31.990000000000006, 'count': {'peopleCount': 1, 'vehicleCount': 0, 'ObjectCount': 0}, 'anomalyIds': [], 'cid': 'QmdbLLjUfi5mBoQBxTerYDwEqvq6tS9sbf7wW5szSBxdTM', 'object': [{'class': 'Person', 'detectionScore': 37.388000000000005, 'activityScore': 10.0, 'track': '100', 'id': '4', 'memDID': None, 'activity': 'Standing', 'detectTime': '2023-06-19 10:37:20.284136+05:30', 'cids': 'Qmd2FwoTXZTVNPk2xj1iYiX5MyEaX1SYafwXGhBBZUkFfz'}]}, 'tenantId': 'e410d5e8-9da4-4144-9dae-78066a71be8b', 'version': 'v0.0.3'}
 # dbpush_members(mem_dict)
+
