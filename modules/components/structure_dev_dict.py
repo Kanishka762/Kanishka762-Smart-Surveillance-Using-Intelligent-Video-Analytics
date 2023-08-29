@@ -47,16 +47,16 @@ def create_device_dict():
             device_dict["port"] = chunk[5]
             device_dict["videoEncodingInformation"] = 'H265'
             device_dict["username"] = chunk[7]
-            # device_dict["rtsp"] = chunk[8]
+            device_dict["rtsp"] = chunk[8]
             # device_dict["rtsp"] = "rtsp://127.0.0.1:8554//facestream"
-            device_dict["rtsp"] = "rtsp://127.0.0.1:8554//facestream"
+            # device_dict["rtsp"] = "rtsp://127.0.0.1:8554//facestream"
             device_dict["password"] = chunk[9]
-            # device_dict["subscriptions"] = chunk[10]
-            device_dict["subscriptions"] = ['Facial-Recognition']#"Facial-Recognition"
+            device_dict["subscriptions"] = chunk[10]
+            # device_dict["subscriptions"] = ['Facial-Recognition']#"Facial-Recognition"
             device_dict["lat"] = chunk[11]
             device_dict["long"] = chunk[12]
             dev_details.append(device_dict)
-        break
+        # break
 
     # print(dev_details)
     for devs in dev_details:
