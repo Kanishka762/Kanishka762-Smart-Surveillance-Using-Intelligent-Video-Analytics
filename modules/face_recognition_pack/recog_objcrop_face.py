@@ -78,34 +78,50 @@ def facedetection(im):
     return coords
 
 def most_common_element(input_list):
-    if not input_list:
+    listOfDIDs = []
+    for each in input_list:
+        listOfDIDs.append(list(each.keys())[0])
+    # print(listOfDIDs)
+    if not listOfDIDs:
         return None
     
     max_count = 0
     most_common = None
     
-    for element in input_list:
-        count = input_list.count(element)
+    for element in listOfDIDs:
+        count = listOfDIDs.count(element)
         if count > max_count:
             max_count = count
             most_common = element
-    
-    return most_common
+    # print("most_common", most_common)
+    for each in input_list:
+        if list(each.keys())[0] == most_common:
+            return each
 
 def faceDecisionmaker(faceDecisionDictionary, didRefer):
     max_key = max(faceDecisionDictionary, key=faceDecisionDictionary.get)
-    did = most_common_element(didRefer[max_key])
-    return did , max_key
+    # print("max_key", max_key)
+    # print("didRefer[max_key]",didRefer[max_key])
+    did_dict = most_common_element(didRefer[max_key])
+
+    # print("did_dict", did_dict)
+
+    return did_dict , max_key
 
 def find_person_type(listOfCrops):
+    global unknown_faces, unknown_ids
     # # print("len(listOfCrops)",len(listOfCrops))
     faceDecisionDictionary = {}
     didRefer = {}
     for oneCrop in listOfCrops:
+        did, track_type, encodings = faceRecognition(oneCrop[0])
         try:
-            did, track_type = faceRecognition(oneCrop[0])
-        except:
+            did, track_type, encodings = faceRecognition(oneCrop[0])
+            # print(did)
+        except exception as e:
+            print(e)
             pass
+            
         # if not faceRecognition(oneCrop[0]):
         #     # print(oneCrop[0].shape)
         #     cv2.imwrite("/home/srihari/deepstreambackend/error_imgs_crops/"+randomword()+".jpg",oneCrop[0])
@@ -116,15 +132,52 @@ def find_person_type(listOfCrops):
         else:
             faceDecisionDictionary[track_type] = 1
         if track_type in didRefer:
-            didRefer[track_type].append(did)
+            didRefer[track_type].append({did:encodings})
         else:
             didRefer[track_type] = []
-            didRefer[track_type].append(did)
+            didRefer[track_type].append({did:encodings})
+
+
     if '' in faceDecisionDictionary:
         removed_value = faceDecisionDictionary.pop('')
-    # # print(faceDecisionDictionary)
-    did, track_type = faceDecisionmaker(faceDecisionDictionary, didRefer)
-    return did , track_type
+        didRefer.pop('')
+    if len(faceDecisionDictionary) > 1:
+        if '100' in faceDecisionDictionary:
+            removed_value = faceDecisionDictionary.pop('100')
+            didRefer.pop('100')
+
+
+
+    # print(faceDecisionDictionary)
+    # print(didRefer)
+    
+    did_dict, track_type = faceDecisionmaker(faceDecisionDictionary, didRefer)
+        
+    # print("did_dict, track_type", did_dict, track_type)
+
+    for key, value in did_dict.items():
+        did = key
+        encodings = value
+    # print("did, track_type",did, track_type)
+    if encodings is not None:
+        if track_type == '10':
+            # print(type(encodings))
+            # print(encodings)
+            try:
+                encodings = encodings[0]
+                # print(unknown_faces)
+                unknown_faces.append(encodings)
+                # print("unknown_faces",unknown_faces)
+                unknown_ids.append(did)
+                # print('unknown_ids',unknown_ids)
+            except:
+                print("error")
+
+    # print("***********************************************")
+    # print(did, track_type)
+    # print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+
+    return did, track_type
 
 
 def faceRecognition(im0):
@@ -148,13 +201,13 @@ def faceRecognition(im0):
 
         # cv2.imwrite("/home/agx123/deepstreambackend/face_test.jpg",crop)
     
-    encodings = face_recognition.face_encodings(image,locations)
     
     did = ""
     track_type = "100"
 
     if len(locations) != 0:
-
+        encodings = face_recognition.face_encodings(image,locations)
+        
         if len(whitelist_faces):
             for face_encoding ,face_location in zip(encodings, locations):
                 matches_white = face_recognition.compare_faces(whitelist_faces,face_encoding)
@@ -166,13 +219,14 @@ def faceRecognition(im0):
                         did = '00'+ str(whitelist_ids[matchindex_white])
                         track_type = "00"
                         # print("++++++++++++++++++++++++++++++++++++")
-                        print(did)
-                        print(track_type)
+                        # print(did)
+                        # print(track_type)
                         # print("++++++++++++++++++++++++++++++++++++")
-                        return did, track_type
+                        return did, track_type, encodings
 
 
         if len(blacklist_faces):
+            # print(' ',blacklist_faces)
             for face_encoding ,face_location in zip(encodings, locations):
                 matches_black = face_recognition.compare_faces(blacklist_faces,face_encoding)
                 faceids_black = face_recognition.face_distance(blacklist_faces,face_encoding)
@@ -186,69 +240,74 @@ def faceRecognition(im0):
                         did = '01'+ str(blacklist_ids[matchindex_black])
                         track_type = "01"
                         # print("--------------------------------------")
-                        print(did)
-                        print(track_type)
+                        # print(did)
+                        # print(track_type)
                         # print("--------------------------------------")
-                        return did, track_type
+                        return did, track_type, encodings
 
 
         if len(unknown_faces):
+            # print("entering unknown recog")
             for face_encoding ,face_location in zip(encodings, locations):
+                # print(face_encoding ,face_location)
                 matches_unknown = face_recognition.compare_faces(unknown_faces,face_encoding)
                 faceids_unknown = face_recognition.face_distance(unknown_faces,face_encoding)
+                # print(matches_unknown ,faceids_unknown)
                 matchindex_unknown = np.argmin(faceids_unknown)
                 minimum_distance.append(min(faceids_unknown))
+                # print(matchindex_unknown, minimum_distance)
                 # # print("faceids_unknown length is ",len(faceids_unknown[0])," for ","unknown_faces,face_encoding of length ", len(unknown_faces),len(face_encoding))
                 if min(faceids_unknown) <=0.70:
-                    if matches_unknown[matchindex_unknown]:
-                        did = "11" + str(unknown_ids[matchindex_unknown])
-                        track_type = "11"
-                        # print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-                        print(did)
-                        print(track_type)
-                        # print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-                        return did, track_type
+                    # print("entering IF")
+                    # print(matches_unknown[matchindex_unknown])
+                    # if matches_unknown[matchindex_unknown]:
+                    did = "11" + str(unknown_ids[matchindex_unknown])
+                    track_type = "11"
+                    # print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                    # print(did)
+                    # print(track_type)
+                    # print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                    return did, track_type, encodings
 
                 else:
+                    # print("entering else")
+
                     # print("encodings", encodings)
-                    unknown_faces.append(encodings[0])
+                    # unknown_faces.append(encodings[0])
                     id = str(uuid.uuid4())
                     did = id
                     track_type = "10"
                     if id not in unknown_ids:
-                        unknown_ids.append(id)
+                        # unknown_ids.append(id)
                         # print(len(whitelist_ids), len(blacklist_ids), len(unknown_ids), whitelist_ids, blacklist_ids, unknown_ids)
 
                         # print("uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")
-                        print(did)
-                        print(track_type)
+                        # print(did)
+                        # print(track_type)
                         # print("uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")
 
-                        return did, track_type
+                        return track_type+did, track_type, encodings
         
 
 
 
         else:
             # print("encodings", encodings)
-
-            unknown_faces.append(encodings[0])
             id = str(uuid.uuid4())
-            did = id
+            did = "10" + id
             track_type = "10"
             if id not in unknown_ids:
-                unknown_ids.append(id)
                 # print(len(whitelist_ids), len(blacklist_ids), len(unknown_ids), whitelist_ids, blacklist_ids, unknown_ids)
 
                 # print("uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")
-                print(did)
-                print(track_type)
+                # print(did)
+                # print(track_type)
                 # print("uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")
-                return did, track_type
+                return did, track_type, encodings
     else:
         did = ""
         track_type = "100"
-        return did, track_type
+        return did, track_type, None
 
 #/home/srihari/deepstreambackend/error_imgs_crops
 # import os
