@@ -207,7 +207,7 @@ def dbpush_members(mem_out):
                         ),
                         inserted_tags AS (
                         INSERT INTO "Tags" (id, "tenantId", name, active, "memberId", "deviceId", "taggableType", "createdAt", "updatedAt")
-                        VALUES (uuid_generate_v4(), %(tenantId)s, %(type)s, %(active)s, (SELECT id FROM inserted_member), %(deviceId)s, %(taggableType)s,   , NOW())
+                        VALUES (uuid_generate_v4(), %(tenantId)s, %(type)s, %(active)s, (SELECT id FROM inserted_member), %(deviceId)s, %(taggableType)s,NOW() , NOW())
                         RETURNING id
                         ),
                         inserted_member_tags AS (

@@ -42,11 +42,11 @@ def generateCropList(listOfFrames):
                 else:
                     cropListDict[trackId] = []
                     cropListDict[trackId].append(objectdict[trackId]['crops'])
-    print([{each:len(cropListDict[each])} for each in cropListDict])
+    # print([{each:len(cropListDict[each])} for each in cropListDict])
     for trackId in cropListDict:
         selectedList = select_elements_with_equal_intervals(cropListDict[trackId], collectionCnt)
         finalCropListDict[trackId] = selectedList
-    print([{each:len(finalCropListDict[each])} for each in finalCropListDict])
+    # print([{each:len(finalCropListDict[each])} for each in finalCropListDict])
     return finalCropListDict
 
 def output_func(my_list,device_id,device_timestamp):

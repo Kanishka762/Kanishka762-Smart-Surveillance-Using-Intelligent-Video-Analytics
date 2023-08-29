@@ -72,9 +72,11 @@ load_dotenv(dotenv_path)
 device = os.getenv("device")
 tenant_name = os.getenv("tenant_name")
 ddns_name = os.getenv("DDNS_NAME")
-
 place = os.getenv("place")
 obj_det_labels = ast.literal_eval(os.getenv("obj_det_labels"))
+classDict = ast.literal_eval(os.getenv("classDict"))
+constantIdObjects = ast.literal_eval(os.getenv("constantIdObjects"))
+
 timezone = pytz.timezone(f'{place}')  #assign timezone
 pgie1_path = cwd + f"/models_deepstream/{tenant_name}/{device}/gender/config.txt"
 pgie2_path = cwd + f"/models_deepstream/{tenant_name}/{device}/fire/config.txt"
@@ -85,7 +87,7 @@ dev_id_dict = {}
 gif_dict = {}
 detect_data = []
 gif_created = {}
-
+cnt = 0
 label_dict = {}
 for i,label in enumerate(obj_det_labels):
     label_dict[label] = i 
@@ -134,6 +136,7 @@ def draw_bounding_boxes(image, obj_meta, confidence):
     left = int(rect_params.left)
     width = int(rect_params.width)
     height = int(rect_params.height)
+    
     # obj_name = pgie_classes_str[obj_meta.class_id]
     obj_name = obj_meta.obj_label
     # image = cv2.rectangle(image, (left, top), (left + width, top + height), (0, 0, 255, 0), 2, cv2.LINE_4)
@@ -174,8 +177,17 @@ def crop_object(image, obj_meta):
     # crop_img = image[top:top+height, left:left+width]
     return crop
 
+def findClassList(subscriptions):
+    subscriptions_class_list = [item for sublist in [classDict[each] for each in subscriptions if each in classDict] for item in sublist]
+    for each in obj_det_labels:
+        subscriptions_class_list.append(each)
+    return subscriptions_class_list
+    
+
+
 def tracker_src_pad_buffer_probe(pad,info,dev_list):
-    global gif_dict
+    # print("called callback")
+    global gif_dict,cnt
 
     frame_number=0
     #Intiallizing object counter with 0.
@@ -207,6 +219,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
     
     # buf_surface = pyds.get_nvds_buf_surface(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
+
     while l_frame is not None:
         try:
             # Note that l_frame.data needs a cast to pyds.NvDsFrameMeta
@@ -234,7 +247,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
         
         dev_info = dev_list[camera_id]
         subscriptions = dev_info['subscriptions']
-        
+        subscriptions_class_list = findClassList(subscriptions)
         for key, value in dev_id_dict.items():
             device_id = value['deviceId']
             if device_id not in gif_dict:
@@ -242,8 +255,8 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
             if device_id not in gif_created:
                 gif_created[device_id] = False
         
-        if 'Bagdogra' not in subscriptions:
-            threading.Thread(target = gif_build,args = (n_frame_copy, dev_id_dict[camera_id], gif_dict, gif_created,)).start()
+        # if 'Bagdogra' not in subscriptions:
+        #     threading.Thread(target = gif_build,args = (n_frame_copy, dev_id_dict[camera_id], gif_dict, gif_created,)).start()
         
         num_detect = frame_meta.num_obj_meta
         # print(datetime.datetime.now(timezone))
@@ -316,21 +329,26 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
 
                 # print(age_dict)
                 # print(detect_type)
-                obj_dict =  {
-                'detect_type' : detect_type,
-                'confidence_score': confidence_score,
-                'obj_id' : obj_id,
-                'bbox_left' : left,
-                'bbox_top' : top,
-                'bbox_right' : left + width,
-                'bbox_bottom' : top + height,
-                'timestamp' :  dt.strftime("%H:%M:%S %d/%m/%Y"),
-                'crop' : cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB),
-                'age' : age_dict[obj_id]
-                # 'dirs' : x,
-                # 'tracker' : y
-                }
-                frame_dict['objects'].append(obj_dict)
+                if detect_type in subscriptions_class_list:
+                    obj_dict =  {
+                    'detect_type' : detect_type,
+                    'confidence_score': confidence_score,
+                    'obj_id' : obj_id,
+                    'bbox_left' : left,
+                    'bbox_top' : top,
+                    'bbox_right' : left + width,
+                    'bbox_bottom' : top + height,
+                    'timestamp' :  dt.strftime("%H:%M:%S %d/%m/%Y"),
+                    'crop' : cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB),
+                    'age' : age_dict[obj_id]
+                    # 'dirs' : x,
+                    # 'tracker' : y
+                    }
+                    # print(obj_dict)
+                    if detect_type in constantIdObjects:
+                        obj_dict['obj_id'] = 1
+                    frame_dict['objects'].append(obj_dict)
+
                 
             except StopIteration:
                 break
@@ -389,14 +407,22 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
             l_frame=l_frame.next
             # detect_data.append(frame_dict)   #optional line detect_data is not used any where just holding all frame_dicts
             if n_frame_bbox is not None:
-                # cv2.imwrite("test1.jpg",n_frame_bbox)
+                # cnt = cnt + 1
+                # if cnt >= 25:
+                #     cv2.imwrite("test1.jpg",n_frame_bbox)
                 frame_dict['np_arr'] = n_frame_bbox   
                 frame_dict['org_frame'] = n_frame
             else:
-                # cv2.imwrite("test1.jpg",frame_copy)
+                
 
                 frame_dict['np_arr'] = frame_copy
                 frame_dict['org_frame'] = n_frame
+            cnt = cnt + 1
+            # print("cnt: ",cnt)
+            # if cnt >= 25:
+            #     cv2.imwrite("test1.jpg",frame_dict['np_arr'])
+            #     cnt = 0
+                
             # print("starting to put elements in queue")
             framedata_queue.put([frame_dict,dev_id_dict])
             # frame_2_dict(framedata_queue)
@@ -461,13 +487,13 @@ def create_source_bin(index,uri):
     # We will use decodebin and let it figure out the container format of the
     # stream and the codec and plug the appropriate demux and decode plugins.
     
-        # use nvurisrcbin to enable file-loop
+    # use nvurisrcbin to enable file-loop
     uri_decode_bin=Gst.ElementFactory.make("nvurisrcbin", "uri-decode-bin")
     uri_decode_bin.set_property("rtsp-reconnect-interval", 50)
     uri_decode_bin.set_property("file-loop", True)
     uri_decode_bin.set_property("udp-buffer-size",1048576)
     uri_decode_bin.set_property("num-extra-surfaces",2)
-    uri_decode_bin.set_property("drop-frame-interval",2)
+    # uri_decode_bin.set_property("drop-frame-interval",2)
     # uri_decode_bin.set_property("file-loop", "true")
     mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
     # uri_decode_bin.set_property("cudadec-memtype", mem_type)
@@ -501,9 +527,6 @@ def main(args):
     global dev_id_dict
     # Check input arguments
     past_tracking_meta[0]=1
-    # if len(args) < 2:
-    #     sys.stderr.write("usage: %s <uri1> [uri2] ... [uriN]\n" % args[0])
-    #     sys.exit(1)
     number_sources=len(args)
     print(number_sources)
 
@@ -515,8 +538,6 @@ def main(args):
     # Create Pipeline element that will form a connection of other elements
     print("Creating Pipeline \n ")
     pipeline = Gst.Pipeline()
-    is_live = False
-
     if not pipeline:
         sys.stderr.write(" Unable to create Pipeline \n")
     print("Creating streamux \n ")
@@ -530,18 +551,10 @@ def main(args):
     for i in range(number_sources):
         print("Creating source_bin ",i," \n ")
         uri_name = args[i]['rtsp']
-        # print("+++++++++++++++")
-        # print(uri_name)
-        # print("+++++++++++++++")
 
-        # dev_id = args[i]['deviceId']
         dev_id_dict[i] = args[i]
         print(dev_id_dict)
 
-        # if uri_name.find("rtsp://") == 0 :
-        #     is_live = True
-        # else:
-        #     uri_name = "file://"+uri_name
         source_bin=create_source_bin(i, uri_name)
         if not source_bin:
             sys.stderr.write("Unable to create source bin \n")
@@ -645,11 +658,16 @@ def main(args):
     queue1 = Gst.ElementFactory.make("queue", "queue_1")
     queue2 = Gst.ElementFactory.make("queue", "queue_2")
     queue3 = Gst.ElementFactory.make("queue", "queue_3")
-    streammux.set_property('config-file-path', 'mux_config.txt')
+    # streammux.set_property('config-file-path', 'mux_config.txt')
+    # streammux.set_property('batch-size', number_sources)
+    # streammux.set_property("sync-inputs",1)
+    # streammux.set_property("max-latency",200)
+    streammux.set_property("max-latency", 40000000)
+    streammux.set_property('sync-inputs', 1)
+    streammux.set_property('width', 1280)
+    streammux.set_property('height', 720)
     streammux.set_property('batch-size', number_sources)
-    streammux.set_property("sync-inputs",1)
-    streammux.set_property("max-latency",200)
-    streammux.set_property('batch-size', number_sources)
+    streammux.set_property('batched-push-timeout', 40000)
 
 
     config = configparser.ConfigParser()
@@ -681,6 +699,7 @@ def main(args):
 
 #############################################################################################################
     pgie1.set_property('config-file-path', pgie1_path)
+    # pgie1.set_property('classifier_async_mode',1)
     pgie1_batch_size=pgie1.get_property("batch-size")
     if(pgie1_batch_size != number_sources):
         print("WARNING: Overriding infer-config batch-size",pgie1_batch_size," with number of sources ", number_sources," \n")
@@ -688,6 +707,8 @@ def main(args):
 
 #############################################################################################################
     sgie1.set_property('config-file-path', sgie1_path)
+    # sgie1.set_property('classifier_async_mode',1)
+
     sgie1_batch_size=sgie1.get_property("batch-size")
     if(sgie1_batch_size != number_sources):
         print("WARNING: Overriding infer-config batch-size",sgie1_batch_size," with number of sources ", number_sources," \n")
@@ -695,13 +716,18 @@ def main(args):
 
 #############################################################################################################    
     sgie2.set_property('config-file-path', sgie2_path)
+    # sgie2.set_property('classifier_async_mode',1)
+
     sgie2_batch_size=sgie2.get_property("batch-size")
+    
     if(sgie2_batch_size != number_sources):
         print("WARNING: Overriding infer-config batch-size",sgie2_batch_size," with number of sources ", number_sources," \n")
     sgie2.set_property("batch-size", number_sources)
 
 #############################################################################################################    
     pgie2.set_property('config-file-path', pgie2_path)
+    # pgie2.set_property('classifier_async_mode',1)
+
     pgie2_batch_size=pgie2.get_property("batch-size")
     if(pgie2_batch_size != number_sources):
         print("WARNING: Overriding infer-config batch-size",pgie2_batch_size," with number of sources ", number_sources," \n")
@@ -762,7 +788,8 @@ def main(args):
         sink = Gst.ElementFactory.make("hlssink", f"sink_{i}")
         pipeline.add(sink)
         devid = dev_id_dict[i]['deviceId']
-        sink.set_property('playlist-root', f'https://{DDNS}/live/{devid}') # Location of the playlist to write
+        # sink.set_property('playlist-root', f'https://{DDNS}/live/{devid}') # Location of the playlist to write
+        sink.set_property('playlist-root', f'http://localhost:9001/{devid}') # Location of the playlist to write
         
         sink.set_property('playlist-location', f'{video_info}/{devid}.m3u8') # Location where .m3u8 playlist file will be stored
         sink.set_property('location',  f'{video_info}/segment.%01d.ts')  # Location whee .ts segmentrs will be stored
