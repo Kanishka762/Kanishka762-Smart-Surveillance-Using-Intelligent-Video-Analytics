@@ -54,6 +54,7 @@ alarm_config = os.getenv("alarm_config")
 
 anamoly_object = ast.literal_eval(os.getenv("anamoly_object"))
 anamoly = ast.literal_eval(os.getenv("anamoly"))
+anamolyMemberCategory = ast.literal_eval(os.getenv('anamolyMemberCategory'))
 # subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 batch_size = int(os.getenv("batch_size"))
 
@@ -95,6 +96,7 @@ def face_recognition_process(output_json,device_id):
     print("started face recognition")
     for detection in output_json['metaData']['object']:
         listOfCrops = detection['cropsNumpyList']
+        # find_person_type(listOfCrops)
         did, track_type = find_person_type(listOfCrops)
         if did == "":
             did = None
@@ -107,6 +109,7 @@ def face_recognition_process(output_json,device_id):
     print(f'FACE OUTPUT: {output_json}')
     with open("./static/test.json", "a") as outfile:
         json.dump(output_json, outfile)
+    # update cache
     dbpush_members(output_json)
 
 
@@ -131,9 +134,9 @@ async def json_publish_activity(primary):
     # await asyncio.tim
 
 async def process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
-    
+    print("process results")
     subscriptions = device_data[device_id]["subscriptions"]
-    
+    # print(output_json)
     if 'Activity' in subscriptions:
         act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
         print(act_batch_res)
@@ -163,7 +166,7 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
             output_json["metaData"]["cid"] = fin_full_frame
 
         # for each in output_json['metaData']['object']:
-        if len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly])>0 or len([True for each in [each["class"] for each in output_json['metaData']['object']] if each in anamoly_object])>0:
+        if len([True for each in [each["activity"] for each in output_json['metaData']['object']] if each in anamoly])>0 or len([True for each in [each["class"] for each in output_json['metaData']['object']] if each in anamoly_object])>0 or len([True for each in [each["track"] for each in output_json['metaData']['object']] if each in anamolyMemberCategory])>0:
             if "Alarm" in subscriptions:
                 print("alarm trigger for activities")
                 try:
@@ -232,7 +235,7 @@ async def process_publish(device_id,batch_data,device_data,device_timestamp):
     # with semaphore:
     #     print("threading.activeCount inside semaphore",threading.activeCount())
 
-    print("entering process_publish")
+    # print("entering process_publish")
     global anamoly_object, anamoly
     device_id_new = device_data[device_id]["deviceId"]
     detectss = 0
@@ -240,7 +243,7 @@ async def process_publish(device_id,batch_data,device_data,device_timestamp):
     for each in batch_data:
         if each["total_detects"] > detectss:
             detectss = each["total_detects"]
-            print("detectss: ",detectss)
+            # print("detectss: ",detectss)
             # cv2.imwrite("./static/img_max_det.jpg", each["det_frame"][0])
             fin_full_frame = each["det_frame"]
     bbox_tensor_lst = [frame_data["bbox_tensor"] for frame_data in batch_data]
@@ -258,10 +261,10 @@ async def process_publish(device_id,batch_data,device_data,device_timestamp):
     # process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame)
     inference_task = asyncio.create_task(process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame))
     await inference_task
-async def intermediate(device_id,batch_data,dev_id_dict, frame_timestamp):
-    print("got imgs")
-    process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
-    # threading.Thread(target = process_publish,args = (device_id,batch_data,dev_id_dict, frame_timestamp,)).start()
+# async def intermediate(device_id,batch_data,dev_id_dict, frame_timestamp):
+#     print("got imgs")
+#     process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
+#     # threading.Thread(target = process_publish,args = (device_id,batch_data,dev_id_dict, frame_timestamp,)).start()
 
 def frame_2_dict():
     while True:
@@ -343,6 +346,7 @@ def frame_2_dict():
             for each in isolate_queue:
                 # print(len(isolate_queue[each]))
                 # print("len(isolate_queue[each])",len(isolate_queue[each]))
+                # print("len(isolate_queue[each]): ",len(isolate_queue[each]))
                 if len(isolate_queue[each])>batch_size:
                     batch_data = isolate_queue[each]
                     isolate_queue[each] = []

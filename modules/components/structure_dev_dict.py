@@ -15,6 +15,7 @@ from modules.components.rtsp_check import check_rtsp_stream
 # cwd = os.getcwd()
 # data_path = join(cwd, 'data')
 # dotenv_path = join(data_path, '.env')
+
 load_dotenv(dotenv_path)
 
 rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
@@ -46,26 +47,30 @@ def create_device_dict():
             device_dict["port"] = chunk[5]
             device_dict["videoEncodingInformation"] = 'H265'
             device_dict["username"] = chunk[7]
-            device_dict["rtsp"] = chunk[8]
-            # device_dict["rtsp"] = rtsp_links[i]
-            # device_dict["rtsp"] = "file:///home/srihari/facerecog.mp4"
+            # device_dict["rtsp"] = chunk[8]
+            # device_dict["rtsp"] = "rtsp://127.0.0.1:8554//facestream"
+            device_dict["rtsp"] = "rtsp://127.0.0.1:8554//facestream"
             device_dict["password"] = chunk[9]
             # device_dict["subscriptions"] = chunk[10]
-            device_dict["subscriptions"] = ["Facial-Recognition", "Activity"]
+            device_dict["subscriptions"] = ['Facial-Recognition']#"Facial-Recognition"
             device_dict["lat"] = chunk[11]
             device_dict["long"] = chunk[12]
             dev_details.append(device_dict)
+        break
+
     # print(dev_details)
     for devs in dev_details:
         # print(devs["subscriptions"])
         if 'Facial-Recognition' in devs["subscriptions"]:
             load_lmdb_list()
             print("removed lmdb contents")
+            #fetching members data from postgres
             mem_data = fetch_db_mem()
             # print(mem_data)
+            #stores the face data to LMDB
             load_lmdb_fst(mem_data)
             load_lmdb_list()
             break    
-       
+    
     threading.Thread(target=gst_hls_push,args=(dev_details,)).start()
     return dev_details
