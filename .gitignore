@@ -3,6 +3,8 @@
 .tbz2
 .pth
 .pt
+.jpg
+.pyc
 Hls_output/
 Hls_output_1/
 Gif_output/
