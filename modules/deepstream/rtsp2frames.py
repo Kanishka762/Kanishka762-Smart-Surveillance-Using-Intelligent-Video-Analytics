@@ -22,6 +22,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 ################################################################################
+
 from modules.components.load_paths import *
 import argparse
 import sys
@@ -495,8 +496,9 @@ def create_source_bin(index,uri):
     uri_decode_bin.set_property("num-extra-surfaces",2)
     # uri_decode_bin.set_property("drop-frame-interval",2)
     # uri_decode_bin.set_property("file-loop", "true")
-    mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
-    # uri_decode_bin.set_property("cudadec-memtype", mem_type)
+    if not is_aarch64():
+        mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
+        uri_decode_bin.set_property("cudadec-memtype", mem_type)
     # else:
     #     uri_decode_bin=Gst.ElementFactory.make("uridecodebin", "uri-decode-bin")
     # if not uri_decode_bin:
@@ -668,6 +670,8 @@ def main(args):
     streammux.set_property('height', 720)
     streammux.set_property('batch-size', number_sources)
     streammux.set_property('batched-push-timeout', 40000)
+    # streammux.set_property('num-surfaces-per-frame', 1)
+    # streammux.set_property('compute-hw', 1)
 
 
     config = configparser.ConfigParser()
@@ -738,7 +742,8 @@ def main(args):
 
     if not is_aarch64():
         mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
-        # streammux.set_property("nvbuf-memory-type", mem_type)
+        # streammux.set_property("nvbuf-memory-type", 0)
+        streammux.set_property("nvbuf-memory-type", mem_type)
         nvvidconv.set_property("nvbuf-memory-type", mem_type)
      
         
@@ -891,11 +896,11 @@ def main(args):
     else:
         tracker_src_pad.add_probe(Gst.PadProbeType.BUFFER, tracker_src_pad_buffer_probe, args)
 
-
     # List the sources
     print("Now playing...")
     for i, source in enumerate(args):
         print(i, ": ", source)
+
 
     print("Starting pipeline \n")
     # start play back and listed to events		
