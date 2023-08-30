@@ -46,7 +46,9 @@ def cid_to_image(cid):
     return im_path
 
 def add_member_to_lmdb(MemberPublish):
+
     list_of_members =  MemberPublish["member"]
+    
     for each_member in list_of_members:
         print(each_member)
         faceCID = each_member["faceCID"]

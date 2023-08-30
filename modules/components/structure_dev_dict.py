@@ -59,6 +59,7 @@ def create_device_dict():
         # break
 
     # print(dev_details)
+    #
     for devs in dev_details:
         # print(devs["subscriptions"])
         if 'Facial-Recognition' in devs["subscriptions"]:
