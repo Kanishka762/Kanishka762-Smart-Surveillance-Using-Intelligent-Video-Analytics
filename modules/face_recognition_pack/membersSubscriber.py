@@ -15,8 +15,11 @@ import nats
 
 from nats.aio.client import Client as NATS
 
-from modules.face_recognition_pack.facedatainsert_lmdb import add_member_to_lmdb
-from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_list
+# from modules.face_recognition_pack.facedatainsert_lmdb import add_member_to_lmdb
+# from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_list
+# from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
+# from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
+
 
 
 # from modules.face_recognition_pack.recog_objcrop_face import cb
@@ -25,20 +28,26 @@ nc = NATS()
 
 async def cb(msg):
     try :
+        global mem_data_queue
+        # print("+++++++++++++++++")
+        # # load_lmdb_list()
+        # print("+++++++++++++++++")
+
         data = (msg.data)
         #print(data)
         data  = data.decode()
         data = json.loads(data)
         print(data)
-        status = add_member_to_lmdb(data)
-        if status:
-            load_lmdb_list()
-            subject = msg.subject
-            reply = msg.reply
-            data = msg.data.decode()
-            await nc.publish(msg.reply,b'ok')
-            print("Received a message on '{subject} {reply}': {data}".format(
-                subject=subject, reply=reply, data=data))
+        mem_data_queue.put([data])
+        # print(status)
+        # if status:
+        # load_lmdb_list()
+        subject = msg.subject
+        reply = msg.reply
+        data = msg.data.decode()
+        await nc.publish(msg.reply,b'ok')
+        print("Received a message on '{subject} {reply}': {data}".format(
+            subject=subject, reply=reply, data=data))
         
     except TypeError as e:
         print(TypeError," nats add member error >> ", e)
@@ -51,9 +60,11 @@ async def face_update_main():
     #await member_video_ipfs(member_did, member_name, member_cid)
     await nc.connect(servers=["nats://216.48.181.154:5222"] , reconnect_time_wait= 50 ,allow_reconnect=True, connect_timeout=20, max_reconnect_attempts=60)
     # sub = await nc.subscribe("member.update.*", cb=cb)
-    sub = await nc.subscribe("service.member_update", cb=cb)
+    sub = await nc.subscribe("member.update.faceid", cb=cb)
 
-def startMemberService():
+def startMemberService(q):
+    global mem_data_queue
+    mem_data_queue = q
     print("starting member service")
     # loop = asyncio.get_event_loop()
     # loop.run_until_complete(face_update_main())

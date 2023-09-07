@@ -75,6 +75,10 @@ tenant_name = os.getenv("tenant_name")
 ddns_name = os.getenv("DDNS_NAME")
 place = os.getenv("place")
 obj_det_labels = ast.literal_eval(os.getenv("obj_det_labels"))
+# print("_)(*&^%$#@@#$%^&*()(*&^%$#@#$%^&*()))")
+# print('obj_det_labels',obj_det_labels)
+# print("_)(*&^%$#@@#$%^&*()(*&^%$#@#$%^&*()))")
+
 classDict = ast.literal_eval(os.getenv("classDict"))
 constantIdObjects = ast.literal_eval(os.getenv("constantIdObjects"))
 
@@ -435,7 +439,8 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
             break
     return Gst.PadProbeReturn.OK	
 
- ######################################################################
+######################################################################
+
 
 def cb_newpad(decodebin, decoder_src_pad,data):
     print("In cb_newpad\n")
