@@ -28,3 +28,5 @@ if os.path.exists(image_path):
     remove_cnts(image_path)
 if not os.path.exists(image_path):
     os.makedirs(image_path)
+
+

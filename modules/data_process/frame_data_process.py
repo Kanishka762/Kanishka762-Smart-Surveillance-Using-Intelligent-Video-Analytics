@@ -13,13 +13,17 @@ import ast
 import nats, json
 import numpy as np
 import asyncio
+import lmdb
 import threading
+# import pickle
 from torch.multiprocessing import Process, set_start_method
 from modules.deepstream.rtsp2frames import framedata_queue
+from collections import deque
 # lock = threading.Lock()
 semaphore = threading.Semaphore(1)  # Allow 3 threads at a time
 resource = []
-
+# trackIdMemIdDict = {}
+# IdLabelInfo = {}
 try:
      set_start_method('spawn')
 except RuntimeError:
@@ -58,6 +62,11 @@ anamolyMemberCategory = ast.literal_eval(os.getenv('anamolyMemberCategory'))
 # subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 batch_size = int(os.getenv("batch_size"))
 
+db_env = lmdb.open(lmdb_path+'/face-detection',
+                max_dbs=10)
+IdLabelInfoDB = db_env.open_db(b'IdLabelInfoDB', create=True)
+trackIdMemIdDictDB = db_env.open_db(b'trackIdMemIdDictDB', create=True)
+
 batch = []
 frame_cnt = 0
 isolate_queue = {}
@@ -91,24 +100,175 @@ def conv_jsonnumpy_2_jsoncid(primary):
     # print(primary)
     return primary
 
+def fetchLMDB(db_txn, key):
+    value = db_txn.get(key.encode())
+    if value is not None:
+        data = json.loads(value.decode())
+        return data
+    else:
+        return None
 
-def face_recognition_process(output_json,device_id):
+def insertLMDB(db_txn, key,value):
+    # print("starting LMDB insertion")
+    # print("\n")
+
+    # print(key, value)
+    # print(key.encode())
+    # print(json.dumps(value).encode())
+    # json.dumps(value).encode()
+    db_txn.put(key.encode(), json.dumps(value).encode())
+
+def updateData(data_dict, new_member_id):
+    # print("trying to remove ",new_member_id," from ", data_dict) 
+    # print("\n")
+
+    keys_to_remove = []
+    for key, value in data_dict.items():
+        if 'memberID' in value and value['memberID'] == new_member_id:
+            keys_to_remove.append(key)
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+    # print(keys_to_remove)
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+    # print("++++++++++++++++++++++++++++++++++++++++++")
+
+
+    for key in keys_to_remove:
+        del data_dict[key]
+
+    # print('after removing', data_dict)
+    # print("\n")
+
+    return data_dict,keys_to_remove
+
+def face_recognition_process(output_json, device_id, act_batch_res):
+    idsToBeRemoved = []
+    # global trackIdMemIdDict
     print("started face recognition")
+
     for detection in output_json['metaData']['object']:
         listOfCrops = detection['cropsNumpyList']
-        # find_person_type(listOfCrops)
-        did, track_type = find_person_type(listOfCrops)
+        # print(len(listOfCrops))
+        # print(listOfCrops)
+
+        with db_env.begin(db=trackIdMemIdDictDB, write=True) as db_txn:
+            data = fetchLMDB(db_txn, "trackIdMemIdDict")
+            if data is not None:
+                if detection['id'] in data:
+                    did, track_type = data[detection['id']]
+                else:
+                    did, track_type = find_person_type(listOfCrops)
+                    if len(detection['cropsNumpyList'])>20:
+                        data[detection['id']] = [did, track_type]
+                        insertLMDB(db_txn, "trackIdMemIdDict", data)
+            else:
+                did, track_type = find_person_type(listOfCrops)
+                data = {}
+                if len(detection['cropsNumpyList'])>20:
+                    data[detection['id']] = [did, track_type]
+                    insertLMDB(db_txn, "trackIdMemIdDict", data)
         if did == "":
             did = None
         detection["track"] = track_type
         detection['memDID'] = did
-        
         del detection['cropsNumpyList']
+
+    # print("starting")
+    # print("\n")
+
+    with db_env.begin(db=trackIdMemIdDictDB, write=True) as db_txn:
+        trackIdMemIdDict = fetchLMDB(db_txn, "trackIdMemIdDict")
+        
+    for objId in act_batch_res:
+        # print("number of ids and its activity", act_batch_res)
+        objId = str(objId)
+        # print("objId",objId)
+        # print(trackIdMemIdDict)
+
+        if objId in trackIdMemIdDict:
+            with db_env.begin(db=IdLabelInfoDB, write=True) as db_txn:
+                data = fetchLMDB(db_txn, "IdLabelInfo")
+                # print("data from LMDB", data)
+                # print("\n")
+
+                # insertLMDBStatus = insertLMDB(db_txn,"IdLabelInfo",data)
+                if data is not None:
+                    # print("LMDB data: ",data)
+                    #update the dict
+                    if objId in data:
+                        if trackIdMemIdDict[objId][0] != '100':
+                            # print('sending for updation',data, trackIdMemIdDict[objId][0])
+                            data,keys_to_remove = updateData(data, trackIdMemIdDict[objId][0])
+                            for each in keys_to_remove:
+                                idsToBeRemoved.append(each)
+                            data[objId]["memberID"] = trackIdMemIdDict[objId][0]
+                        if data[objId]["memberID"] is None:
+                            data[objId]["memberID"] = trackIdMemIdDict[objId][0]
+                        if len(data[objId]["activity"]) < 4:
+                            data[objId]["activity"].append(act_batch_res[int(objId)])
+                        else:
+                            data[objId]["activity"].pop(0)
+                            data[objId]["activity"].append(act_batch_res[int(objId)])
+                        insertLMDB(db_txn, "IdLabelInfo", data)
+
+                    else:
+                        #insert the data
+                        # print("entered else")
+                        actList = []
+                        actList.append(act_batch_res[int(objId)])
+                        if trackIdMemIdDict[objId][0] != '100':
+                            # print('sending for updation',data, trackIdMemIdDict[objId][0])
+                            data,keys_to_remove = updateData(data, trackIdMemIdDict[objId][0])
+                            for each in keys_to_remove:
+                                idsToBeRemoved.append(each)
+                        data[objId] = {"memberID":trackIdMemIdDict[objId][0],"activity":actList}
+                        
+                        insertLMDB(db_txn, "IdLabelInfo", data)
+                else:
+                    # print("entered final else")
+
+                    data = {}
+                    insertLMDB(db_txn, "IdLabelInfo", data)
+                print("updateddata after face recognition", data)
+                print("\n")
+
+                
+
+    # print("act_batch_res",act_batch_res)
+    # print("\n")
+
+    # print("trackIdMemIdDict",trackIdMemIdDict)
+    # print(IdLabelInfo)
+    
+    print("*----------*---------*----------*----------*")
+
     output_json = conv_jsonnumpy_2_jsoncid(output_json)
+
+    # print(f'old FACE OUTPUT: {output_json}')
+    # print("___________________________________________________")
+    # print("___________________________________________________")
+    # print("___________________________________________________")
+    # print("___________________________________________________")
+
+    # print(idsToBeRemoved)
+    # print("___________________________________________________")
+    # print("___________________________________________________")
+    # print("___________________________________________________")
+    # print("___________________________________________________")
+
+    output_json['metaData']['object'] = [
+        obj for obj in output_json['metaData']['object'] if obj['id'] not in idsToBeRemoved
+    ]
+
     print("\n")
-    print(f'FACE OUTPUT: {output_json}')
+    print(f'updated FACE OUTPUT: {output_json}')
     with open("./static/test.json", "a") as outfile:
         json.dump(output_json, outfile)
+
     # update cache
     dbpush_members(output_json)
 
@@ -137,9 +297,45 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
     print("process results")
     subscriptions = device_data[device_id]["subscriptions"]
     # print(output_json)
+    act_batch_res={}
     if 'Activity' in subscriptions:
         act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
-        print(act_batch_res)
+        for objId in act_batch_res:
+            objId = str(objId)
+            with db_env.begin(db=IdLabelInfoDB, write=True) as db_txn:
+                data = fetchLMDB(db_txn, "IdLabelInfo")
+                # print("data fetched by activity",data)
+                # print("\n")
+
+                if data is not None:
+                    if objId in data:
+                        if len(data[objId]["activity"]) < 4:
+                            data[objId]["activity"].append(act_batch_res[int(objId)])
+                        else:
+                            data[objId]["activity"].pop(0)
+                            data[objId]["activity"].append(act_batch_res[int(objId)])
+                        insertLMDB(db_txn, "IdLabelInfo", data)
+                    else:
+                        actList = []
+                        actList.append(act_batch_res[int(objId)])
+                        # data = {}
+                        data[objId] = {"memberID":None,"activity":actList}
+                        insertLMDB(db_txn, "IdLabelInfo", data)
+
+
+                else:
+                    actList = []
+                    actList.append(act_batch_res[int(objId)])
+                    data = {}
+                    data[objId] = {"memberID":None,"activity":actList}
+                    insertLMDB(db_txn, "IdLabelInfo", data)
+                print("data after activityupdate ",data)
+                print("\n")
+
+                
+
+
+        # print(act_batch_res)
         output_json = merge_activity(act_batch_res, output_json)
 
     if output_json['metaData']['object']:
@@ -196,7 +392,7 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
                     await publish_status
                     print("DB insertion successful :)")
                     if 'Facial-Recognition' in subscriptions:
-                        face_recognition_process(output_json_fr,device_id)
+                        face_recognition_process(output_json_fr,device_id, act_batch_res)
                         # asyncio.create_task(face_recognition_process(output_json_fr,device_id))
                         # threading.Thread(target = face_recognition_process,args = (output_json_fr,device_id,)).start()
                     #did,track_type = find_person_type(objectt["crop"])
@@ -218,7 +414,7 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
                 if(status == "SUCCESS!!"):
                     print("DB insertion successful :)")
                     if 'Facial-Recognition' in subscriptions:
-                        face_recognition_process(output_json_fr,device_id)
+                        face_recognition_process(output_json_fr,device_id, act_batch_res)
                         # asyncio.create_task(face_recognition_process(output_json_fr,device_id))
                         # threading.Thread(target = face_recognition_process,args = (output_json_fr,device_id,)).start()
                     # with open("./static/test.json", "a") as outfile:
