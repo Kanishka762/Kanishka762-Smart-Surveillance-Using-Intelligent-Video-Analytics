@@ -17,7 +17,7 @@ import lmdb
 import threading
 # import pickle
 from torch.multiprocessing import Process, set_start_method
-from modules.deepstream.rtsp2frames import framedata_queue
+from modules.deepstream.rtsp2rtsp import framedata_queue
 from collections import deque
 # lock = threading.Lock()
 semaphore = threading.Semaphore(1)  # Allow 3 threads at a time
