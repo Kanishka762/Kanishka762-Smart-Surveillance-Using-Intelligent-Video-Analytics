@@ -68,7 +68,13 @@ def create_device_dict(mem_data_queue):
             print("removed lmdb contents")
             #fetching members data from postgres
             mem_data = fetch_db_mem()
+            print("\n")
             print(mem_data)
+            print("\n")
+            print("\n")
+            print("\n")
+            print("\n")
+
             #stores the face data to LMDB
             mem_data_queue.put(mem_data)
             # load_lmdb_list()

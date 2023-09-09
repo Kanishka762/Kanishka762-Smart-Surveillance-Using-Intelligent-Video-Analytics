@@ -3,14 +3,19 @@ import face_recognition
 import cv2
 import subprocess as sp
 import os
-
+# import t
 from modules.components.load_paths import *
 # from modules.face_recognition_pack.facedatainsert_lmdb import add_member_to_lmdb
 from dotenv import load_dotenv
+import random, string, threading, time
 
 load_dotenv(dotenv_path)
 ipfs_url = os.getenv("ipfs")
 
+def randomword():
+    length = 7 
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
 
 
 def cid_to_imagenumpy(cid):
@@ -25,10 +30,24 @@ def cid_to_imagenumpy(cid):
 
 def faceNumpy2encodings(faceNumpy):
     try:
+        start_time = time.time()
+
         encoding = face_recognition.face_encodings(faceNumpy)[0]
+        end_time = time.time()
+        # print(end_time - start_time)
+        print(f"Elapsed time: {end_time - start_time} seconds")
         return encoding
     except:
-        # cv2.imwrite("er.jpg",faceNumpy)
+        randd = randomword()
+        print("*******&&&&&&&&&&*********")
+        print("*******&&&&&&&&&&*********")
+        print("*******&&&&&&&&&&*********")
+
+        # cv2.imwrite("/home/srihari/deepstreambackend/faceerrors/"+randd+".jpg",faceNumpy)
+        print("*******&&&&&&&&&&*********")
+        print("*******&&&&&&&&&&*********")
+        print("*******&&&&&&&&&&*********")
+
         pass
 
 

@@ -109,13 +109,6 @@ def fetchLMDB(db_txn, key):
         return None
 
 def insertLMDB(db_txn, key,value):
-    # print("starting LMDB insertion")
-    # print("\n")
-
-    # print(key, value)
-    # print(key.encode())
-    # print(json.dumps(value).encode())
-    # json.dumps(value).encode()
     db_txn.put(key.encode(), json.dumps(value).encode())
 
 def updateData(data_dict, new_member_id):
@@ -382,7 +375,7 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
             for detection in output_json['metaData']['object']:
                 del detection['cropsNumpyList']
                 
-            # print("THE OUTPUT JSON STRUCTURE: ",output_json)
+            print("THE OUTPUT JSON STRUCTURE: ",output_json)
             
             if 'Bagdogra' not in subscriptions:
                 status = dbpush_activities(output_json)
