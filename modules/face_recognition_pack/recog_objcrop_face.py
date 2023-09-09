@@ -1,3 +1,4 @@
+from modules.components.load_paths import *
 from io import BytesIO
 import face_recognition 
 import subprocess as sp
@@ -13,8 +14,9 @@ import random
 import uuid
 # from modules.face_recognition_pack.lmdb_list_gen import insertWhitelistDb, insertBlacklistDb, insertUnknownDb
 from modules.face_recognition_pack.convertCID2encodings import convertMemData2encoding
+import lmdb
 
-import random, string, threading, time
+import random, string, threading, time, json
 #/home/srihari/deepstreambackend/modules/face_recognition_pack/facedatainsert_lmdb.py
 
 face_did_encoding_store = dict()
@@ -23,6 +25,9 @@ batch_person_id = []
 FRAME_THICKNESS = 3
 FONT_THICKNESS = 2
 
+db_env = lmdb.open(lmdb_path+'/face-detection',
+                max_dbs=10)
+faceDataDictDB = db_env.open_db(b'faceDataDictDB', create=True)
 # model = YOLO("./models_deepstream/best.pt")
 
 
@@ -32,7 +37,7 @@ FONT_THICKNESS = 2
 # blacklist_ids = []
 # unknown_faces = []
 # unknown_ids = []
-callGlobalvariable = True
+# callGlobalvariable = True
 faceData = {"whitelist_faces":[],"whitelist_ids":[],"blacklist_faces":[],"blacklist_ids":[],"unknown_faces":[],"unknown_ids":[]}
 
 # def callFaceLists():
@@ -52,59 +57,101 @@ faceData = {"whitelist_faces":[],"whitelist_ids":[],"blacklist_faces":[],"blackl
 #     print(len(whitelist_faces),len(blacklist_faces),len(unknown_faces))
 #     print(len(whitelist_ids),len(blacklist_ids),len(unknown_ids))
 #         # time.sleep(1)
+def insertLMDB(db_txn, key,value):
 
+    for category in value:
+        if category in ["whitelist_faces","blacklist_faces","unknown_faces"]:
+            convList = []
+            for encodings in value[category]:
+                print('before encoding',encodings)
+                encodings = json.dumps(encodings.tolist())
+                print('encodings',type(encodings))
+                convList.append(encodings)
+            value[category] = convList
 
+    db_txn.put(key.encode(), json.dumps(value).encode())
+
+def fetchLMDB(db_txn, key):
+    value = db_txn.get(key.encode())
+    if value is not None:
+        data = json.loads(value.decode())
+        for category in data:
+            if category in ["whitelist_faces","blacklist_faces","unknown_faces"]:
+                listOfNumpuArray = []
+                for encodedData in data[category]:
+                    numpyArray = np.array(json.loads(encodedData))
+                    # print('numpyArray',type(numpyArray))
+                    listOfNumpuArray.append(numpyArray)
+                data[category] = listOfNumpuArray
+
+        return data
+    else:
+        return None
 
 def load_lmdb_fst(mem_data_queue):
     while True:
         try:
-            global faceData, callGlobalvariable
-            
+            # global faceData, callGlobalvariable
             mem_data = mem_data_queue.get()
-            callGlobalvariable = False
-            print("changed to False: ",callGlobalvariable)
-            print(mem_data)
+            print("got data from queue starting member data insertion")
+            with db_env.begin(db=faceDataDictDB, write=True) as db_txn:
+                faceData = fetchLMDB(db_txn, "faceData")
+
+            print("got face data", faceData)
+
+            if faceData is None:
+                faceData = {"whitelist_faces":[],"whitelist_ids":[],"blacklist_faces":[],"blacklist_ids":[],"unknown_faces":[],"unknown_ids":[]}
+            
+            # callGlobalvariable = False
+            # print("changed to False: ",callGlobalvariable)
+            print(len(mem_data))
             # global whitelist_faces, blacklist_faces, unknown_faces, whitelist_ids, blacklist_ids, unknown_ids
             # print(len(whitelist_faces),len(blacklist_faces),len(unknown_faces))
             # print(len(whitelist_ids),len(blacklist_ids),len(unknown_ids))
             # with global_lock:
             i = 0
             for each_member in mem_data:
-                i = i+1
-                # print(each_member)
-                encodings, class_type, memberId = convertMemData2encoding(each_member)
-                # print(encodings, class_type, memberId)
 
-                # merge_global()
-                # merge_global(whitelist_faces, blacklist_faces, unknown_faces, whitelist_ids, blacklist_ids, unknown_ids)
-                
-                if class_type == "whitelist" and encodings is not None:
-                    faceData['whitelist_faces'].append(encodings)
-                    faceData['whitelist_ids'].append(memberId)
-                    print("***********************")
+                print(each_member['member'][0]['type'])
+
+                if each_member['member'][0]['type'] in ['whitelist','blacklist']:
+                    i = i+1
+                    # print(each_member)
+                    encodings, class_type, memberId = convertMemData2encoding(each_member)
                     
-                    # print(len(whitelist_faces),len(blacklist_faces),len(unknown_faces))
-                    # print(len(whitelist_ids),len(blacklist_ids),len(unknown_ids))
+                    print('encodings',encodings)
 
-                if class_type == "blacklist" and encodings is not None:
-                    faceData['blacklist_faces'].append(encodings)
-                    faceData['blacklist_ids'].append(memberId)
-                    print("***********************")
+                    # merge_global()
+                    # merge_global(whitelist_faces, blacklist_faces, unknown_faces, whitelist_ids, blacklist_ids, unknown_ids)
+                    
+                    if class_type == "whitelist" and encodings is not None:
+                        faceData['whitelist_faces'].append(encodings)
+                        faceData['whitelist_ids'].append(memberId)
+                        print("***********************")
+                        
+                        # print(len(whitelist_faces),len(blacklist_faces),len(unknown_faces))
+                        # print(len(whitelist_ids),len(blacklist_ids),len(unknown_ids))
 
-                    # print(len(whitelist_faces),len(blacklist_faces),len(unknown_faces))
-                    # print(len(whitelist_ids),len(blacklist_ids),len(unknown_ids))
+                    if class_type == "blacklist" and encodings is not None:
+                        faceData['blacklist_faces'].append(encodings)
+                        faceData['blacklist_ids'].append(memberId)
+                        print("***********************")
 
-                # if class_type == "unknown" and encodings is not None:
-                #     faceData['unknown_faces'].append(encodings)
-                #     faceData['unknown_ids'].append(memberId)
-                #     print("***********************")
+                        # print(len(whitelist_faces),len(blacklist_faces),len(unknown_faces))
+                        # print(len(whitelist_ids),len(blacklist_ids),len(unknown_ids))
 
-
+                    # if class_type == "unknown" and encodings is not None:
+                    #     faceData['unknown_faces'].append(encodings)
+                    #     faceData['unknown_ids'].append(memberId)
+                    #     print("***********************")
+            # print("faceData",faceData)
+            with db_env.begin(db=faceDataDictDB, write=True) as db_txn:
+                insertLMDB(db_txn, "faceData", faceData)
             print(len(faceData['whitelist_faces']),len(faceData['blacklist_faces']),len(faceData['unknown_faces']))
             print(len(faceData['whitelist_ids']),len(faceData['blacklist_ids']),len(faceData['unknown_ids']))
             # time.sleep(3)
-            callGlobalvariable = True
-            print("changed to True: ",callGlobalvariable)
+            # callGlobalvariable = True
+            # print("changed to True: ",callGlobalvariable)
 
         except Exception as e:
             print(e)
@@ -198,16 +245,18 @@ def faceDecisionmaker(faceDecisionDictionary, didRefer):
 
 def find_person_type(listOfCrops):
     global unknown_faces, unknown_ids
-    # # print("len(listOfCrops)",len(listOfCrops))
+    print("len(listOfCrops)",len(listOfCrops))
     faceDecisionDictionary = {}
     didRefer = {}
 
     for oneCrop in listOfCrops:
+        # print("insideloop")
         # faceRecognition(oneCrop[0])
 
         # did, track_type, encodings = faceRecognition(oneCrop[0])
         # print(did, track_type)
         try:
+            # print("sending to face recog")
             data = faceRecognition(oneCrop[0])
     
             did, track_type, encodings = data
@@ -270,15 +319,19 @@ def find_person_type(listOfCrops):
 
 
 def faceRecognition(im0):
-    # print(type(im0))
-    # global whitelist_faces, blacklist_faces, unknown_faces, whitelist_ids, blacklist_ids, unknown_ids
-    global faceData, callGlobalvariable
-    # print('callGlobalvariable: ',callGlobalvariable)
-    # whitelist_faces, blacklist_faces, unknown_faces, whitelist_ids, blacklist_ids, unknown_ids = [],[],[],[],[],[]
-    if callGlobalvariable:
+    # print("starting face recog")
+    # print(db_env)
+    # print(faceDataDictDB)
+    
+    with db_env.begin(db=faceDataDictDB) as db_txn:
+        # print(db_txn)
+        faceData = fetchLMDB(db_txn, "faceData")
+
+    # print('faceData',faceData)
+    if faceData:
         # print(faceData)
         whitelist_faces, blacklist_faces, unknown_faces, whitelist_ids, blacklist_ids, unknown_ids = faceData['whitelist_faces'],faceData['blacklist_faces'],faceData['unknown_faces'],faceData['whitelist_ids'],faceData['blacklist_ids'],faceData['unknown_ids']
-  
+        
         minimum_distance = []
         np_arg_src_list = whitelist_faces + blacklist_faces
         np_bytes2 = BytesIO()
@@ -419,8 +472,6 @@ def faceRecognition(im0):
             # print(did, track_type, None)
             return [did, track_type, im0]
     else:
-        # print("starting unidentified")
-
         did = ""
         track_type = "100"
         # print(did, track_type, None)

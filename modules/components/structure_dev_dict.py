@@ -53,7 +53,7 @@ def create_device_dict(mem_data_queue):
             # device_dict["rtsp"] = "rtsp://test:test123456789@streams.ckdr.co.in:2554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
             device_dict["password"] = chunk[9]
             device_dict["subscriptions"] = chunk[10]
-            # device_dict["subscriptions"] = ['Facial-Recognition']#'Facial-Recognition', 'Activity'
+            # device_dict["subscriptions"] = ['Facial-Recognition', 'Activity']#'Facial-Recognition', 'Activity'
             device_dict["lat"] = chunk[11]
             device_dict["long"] = chunk[12]
             dev_details.append(device_dict)
@@ -66,7 +66,13 @@ def create_device_dict(mem_data_queue):
             print("removed lmdb contents")
             #fetching members data from postgres
             mem_data = fetch_db_mem()
+            print("\n")
             print(mem_data)
+            print("\n")
+            print("\n")
+            print("\n")
+            print("\n")
+
             #stores the face data to LMDB
             mem_data_queue.put(mem_data)
             # load_lmdb_list()
