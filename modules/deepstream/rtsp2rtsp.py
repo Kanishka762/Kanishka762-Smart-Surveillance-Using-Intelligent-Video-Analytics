@@ -105,13 +105,14 @@ pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
 
 UDP_PORT = 5400
 RTSP_PORT = 8554
-BITRATE  = 1000000
+BITRATE  = 4000000
 CODEC = 'H264'
 
 db_env = lmdb.open(lmdb_path+'/face-detection',
                 max_dbs=10)
 
 IdLabelInfoDB = db_env.open_db(b'IdLabelInfoDB', create=True)
+trackIdMemIdDictDB = db_env.open_db(b'trackIdMemIdDictDB', create=True)
 
 # static_path = join(cwd, 'static')
 
@@ -192,7 +193,7 @@ def findClassList(subscriptions):
         subscriptions_class_list.append(each)
     return subscriptions_class_list
     
-def fetch_label_info(detect_type):
+def fetch_activity_info(detect_type):
     key = "IdLabelInfo"
     output_dict = {}
     with db_env.begin(db=IdLabelInfoDB, write=True) as db_txn:
@@ -222,6 +223,17 @@ def fetch_label_info(detect_type):
                 output_dict[key] = sentence
             
             return output_dict
+        else:
+            return None
+        
+def fetch_member_info(detect_type):
+    key = "trackIdMemIdDict"
+    output_dict = {}
+    with db_env.begin(db=trackIdMemIdDictDB, write=True) as db_txn:
+        value = db_txn.get(key.encode())
+        if value is not None:
+            data = json.loads(value.decode())
+            print("FETCH MEMBER: ", data)
         else:
             return None
 
@@ -271,7 +283,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
         frame_copy = cv2.cvtColor(frame_copy, cv2.COLOR_RGBA2RGB)
         
         n_frame_copy = cv2.cvtColor(n_frame, cv2.COLOR_RGBA2RGB)
-        cv2.imwrite(f'{frame_path}/{frame_number}.jpg',frame_copy)
+        # cv2.imwrite(f'{frame_path}/{frame_number}.jpg',frame_copy)
         
         camera_id = frame_meta.pad_index
         
@@ -316,6 +328,8 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                 width = rect_params.width
                 height = rect_params.height
                 
+                print("DETECT TYPE: ", detect_type)
+                
                 if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
                     rect_params.has_bg_color = 1
                     rect_params.border_color.red = 0.0
@@ -355,13 +369,13 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
 
                 n_frame_bbox = None
                 n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence)
-                cv2.imwrite(f'{infer_path}/{frame_number}.jpg',n_frame_bbox)
+                # cv2.imwrite(f'{infer_path}/{frame_number}.jpg',n_frame_bbox)
                 
                 n_frame_crop = crop_object(n_frame, obj_meta)
                 frame_crop_copy = cv2.cvtColor(n_frame_crop, cv2.COLOR_RGBA2BGRA)
                 frame_crop = cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB)
-                if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_2):
-                    cv2.imwrite(f'{crop_path}/{frame_number}.jpg',frame_crop)
+                # if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_2):
+                    # cv2.imwrite(f'{crop_path}/{frame_number}.jpg',frame_crop)
                 
                 parent  = obj_meta.parent
 
@@ -373,7 +387,12 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                 # print("OBJECT ID: ", obj_id)
                 
                 if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
-                    output_lbl = fetch_label_info(detect_type)
+                    # if 'Activity' in subscriptions:
+                        # output_lbl = fetch_activity_info(detect_type)
+                    # else:
+                    #     print("MEMBER SUBSCRIBED")
+                    #     out = fetch_member_info(detect_type)
+                    output_lbl = fetch_activity_info(detect_type)
                     print("###################################################")
                     print("###################################################")
                     print("###################################################")
@@ -381,10 +400,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     print("OBJECT ID: ", obj_id)
                     print(output_lbl)
                     if output_lbl is not None:
-                        # print("OUTPUT Label is not None")
-                        print(len(output_lbl))
                         if len(output_lbl)!=0:
-                            # print("OUTPUT length is not 0")
                             obj_id_str = str(obj_id)
                             if obj_id_str in output_lbl:
                                 print(output_lbl[obj_id_str])
@@ -801,7 +817,7 @@ def main(server, args):
             sys.stderr.write(" Unable to create encoder")
         encoder.set_property("bitrate", BITRATE)
         encoder.set_property("control-rate", 1)
-        encoder.set_property("vbv-size", 500000)
+        encoder.set_property("vbv-size", 2800000)
         encoder.set_property("insert-sps-pps", 1)
         encoder.set_property("iframeinterval", 2)
         encoder.set_property("maxperf-enable", True)
