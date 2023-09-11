@@ -387,12 +387,12 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                 # print("OBJECT ID: ", obj_id)
                 
                 if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
-                    if 'Activity' in subscriptions:
-                        output_lbl = fetch_activity_info(detect_type)
-                    else:
-                        print("MEMBER SUBSCRIBED")
-                        out = fetch_member_info(detect_type)
-                    
+                    # if 'Activity' in subscriptions:
+                        # output_lbl = fetch_activity_info(detect_type)
+                    # else:
+                    #     print("MEMBER SUBSCRIBED")
+                    #     out = fetch_member_info(detect_type)
+                    output_lbl = fetch_activity_info(detect_type)
                     print("###################################################")
                     print("###################################################")
                     print("###################################################")
