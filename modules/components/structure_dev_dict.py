@@ -50,7 +50,7 @@ def create_device_dict(mem_data_queue):
             device_dict["username"] = chunk[7]
             # device_dict["rtsp"] = chunk[8]
             device_dict["rtsp"] = rtsp_links[i]
-            # device_dict["rtsp"] = "file:///home/development/Videos/gun_yt2.mp4"
+            # device_dict["rtsp"] = "file:///home/development/Videos/Sample_10/2.mp4"
             # device_dict["rtsp"] = "rtsp://test:test123456789@streams.ckdr.co.in:2554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
             device_dict["password"] = chunk[9]
             # device_dict["subscriptions"] = chunk[10]
