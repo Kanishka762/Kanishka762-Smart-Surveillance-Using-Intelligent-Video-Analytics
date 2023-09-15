@@ -134,7 +134,7 @@ def updateData(data_dict, new_member_id):
         del data_dict[key]
 
     # print('after removing', data_dict)
-    # print("\n")
+    # print("\n") 
 
     return data_dict,keys_to_remove
 
@@ -154,12 +154,12 @@ def face_recognition_process(output_json, device_id, act_batch_res):
                 if detection['id'] in data:
                     did, track_type = data[detection['id']]
                 else:
-                    did, track_type = find_person_type(listOfCrops)
+                    did, track_type, encodings = find_person_type(listOfCrops)
                     if len(detection['cropsNumpyList'])>20:
                         data[detection['id']] = [did, track_type]
                         insertLMDB(db_txn, "trackIdMemIdDict", data)
             else:
-                did, track_type = find_person_type(listOfCrops)
+                did, track_type, encodings = find_person_type(listOfCrops)
                 data = {}
                 if len(detection['cropsNumpyList'])>20:
                     data[detection['id']] = [did, track_type]
@@ -168,6 +168,10 @@ def face_recognition_process(output_json, device_id, act_batch_res):
             did = None
         detection["track"] = track_type
         detection['memDID'] = did
+        if track_type in ["10","11"]:
+
+            detection['cids'] = encodings
+
         del detection['cropsNumpyList']
 
     # print("starting")

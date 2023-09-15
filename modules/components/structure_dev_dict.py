@@ -13,6 +13,14 @@ from modules.db.db_fetch_members import fetch_db_mem
 # from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
 # from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
 from modules.components.rtsp_check import check_rtsp_stream
+from modules.face_recognition_pack.membersSubscriber import startMemberService
+from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
+
+import queue
+# global_lock = threading.Lock()
+#/home/srihari/deepstreambackend/modules/face_recognition_pack/membersSubscriber.py
+
+mem_data_queue = queue.Queue()
 # cwd = os.getcwd()
 # data_path = join(cwd, 'data')
 # dotenv_path = join(data_path, '.env')
@@ -22,7 +30,7 @@ load_dotenv(dotenv_path)
 rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
 # subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 
-def create_device_dict(mem_data_queue):
+def create_device_dict():
     
     # if 'Face-Recognition' in subscriptions:
     #     load_lmdb_list()
@@ -62,6 +70,8 @@ def create_device_dict(mem_data_queue):
     for devs in dev_details:
         # print(devs["subscriptions"])
         if 'Facial-Recognition' in devs["subscriptions"]:
+            threading.Thread(target = startMemberService, args=(mem_data_queue,)).start()
+            threading.Thread(target=load_lmdb_fst, args=(mem_data_queue,)).start()
             # load_lmdb_list()
             print("removed lmdb contents")
             #fetching members data from postgres
