@@ -40,7 +40,7 @@ def gst_hls_push(deviceInfo):
         else:
             hostname = ddns_name
             
-        hls_url = f'http://{hostname}/live/{device_id}/{device_id}.m3u8'        
+        hls_url = f'https://{hostname}/live/{device_id}/{device_id}.m3u8'        
         # Define the update statement
         query='''UPDATE "DeviceMetaData" SET uri=%s WHERE "deviceId"=%s;'''
             
