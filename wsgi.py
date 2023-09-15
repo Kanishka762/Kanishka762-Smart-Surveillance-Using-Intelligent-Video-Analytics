@@ -13,8 +13,6 @@ from modules.deepstream.rtsp2rtsp import main
 from modules.components.structure_dev_dict import create_device_dict
 from modules.db.db_push import gif_push
 from modules.data_process.frame_data_process import frame_2_dict
-from modules.face_recognition_pack.membersSubscriber import startMemberService
-from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
 
 load_dotenv(dotenv_path)
 # global_lock = threading.Lock()
@@ -35,11 +33,10 @@ if __name__ == '__main__':
     threading.Thread(target = frame_2_dict).start()
     # threading.Thread(target = merge_global).start()
 
-    threading.Thread(target = startMemberService, args=(mem_data_queue,)).start()
-    threading.Thread(target=load_lmdb_fst, args=(mem_data_queue,)).start()
+
     # p.daemon=True
     # p.start()
-    dev_details = create_device_dict(mem_data_queue)
+    dev_details = create_device_dict()
     print(dev_details)
     main(server, dev_details)
 

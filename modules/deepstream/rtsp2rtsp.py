@@ -393,22 +393,22 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     #     print("MEMBER SUBSCRIBED")
                     #     out = fetch_member_info(detect_type)
                     output_lbl = fetch_activity_info(detect_type)
-                    print("###################################################")
-                    print("###################################################")
-                    print("###################################################")
-                    print("###################################################")
-                    print("OBJECT ID: ", obj_id)
-                    print(output_lbl)
+                    # print("###################################################")
+                    # print("###################################################")
+                    # print("###################################################")
+                    # print("###################################################")
+                    # print("OBJECT ID: ", obj_id)
+                    # print(output_lbl)
                     if output_lbl is not None:
                         if len(output_lbl)!=0:
                             obj_id_str = str(obj_id)
                             if obj_id_str in output_lbl:
                                 print(output_lbl[obj_id_str])
                                 text_params.display_text = output_lbl[obj_id_str]
-                    print("###################################################")
-                    print("###################################################")
-                    print("###################################################")
-                    print("###################################################")
+                    # print("###################################################")
+                    # print("###################################################")
+                    # print("###################################################")
+                    # print("###################################################")
 
 
                 if obj_id not in age_dict:
@@ -817,12 +817,13 @@ def main(server, args):
             sys.stderr.write(" Unable to create encoder")
         encoder.set_property("bitrate", BITRATE)
         encoder.set_property("control-rate", 1)
-        encoder.set_property("vbv-size", 2800000)
-        encoder.set_property("insert-sps-pps", 1)
-        encoder.set_property("iframeinterval", 2)
-        encoder.set_property("maxperf-enable", True)
-        encoder.set_property("idrinterval", 5)
-        encoder.set_property("preset-level", 2)
+        if is_aarch64():
+            encoder.set_property("vbv-size", 2800000)
+            encoder.set_property("insert-sps-pps", 1)
+            encoder.set_property("iframeinterval", 2)
+            encoder.set_property("maxperf-enable", True)
+            encoder.set_property("idrinterval", 5)
+            encoder.set_property("preset-level", 2)
         # encoder.set_property("insert-vui", True)
         # encoder.set_property("insert-aud", True)
         # if is_aarch64():
