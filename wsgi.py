@@ -9,7 +9,7 @@ from gi.repository import Gst, GstRtspServer, GLib
 
 from init import *
 from modules.components.load_paths import *
-from modules.deepstream.rtsp2rtsp import main
+from modules.deepstream.rtsp2frames import main
 from modules.components.structure_dev_dict import create_device_dict
 from modules.db.db_push import gif_push
 from modules.data_process.frame_data_process import frame_2_dict
@@ -38,5 +38,5 @@ if __name__ == '__main__':
     # p.start()
     dev_details = create_device_dict()
     print(dev_details)
-    main(server, dev_details)
+    main(dev_details)
 

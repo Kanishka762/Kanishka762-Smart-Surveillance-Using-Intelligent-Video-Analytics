@@ -73,6 +73,7 @@ anomaly_objs = ast.literal_eval(os.getenv("anamoly_object"))
 classDict = ast.literal_eval(os.getenv("classDict"))
 constantIdObjects = ast.literal_eval(os.getenv("constantIdObjects"))
 track_type = ast.literal_eval(os.getenv("track_type"))
+frame_bbox_color = ast.literal_eval(os.getenv("color"))
 
 timezone = pytz.timezone(f'{place}')  #assign timezone
 pgie1_path = cwd + f"/models_deepstream/{tenant_name}/{device}/gender/config.txt"
@@ -110,36 +111,10 @@ CODEC = 'H264'
 
 db_env = lmdb.open(lmdb_path+'/face-detection',
                 max_dbs=10)
-
 IdLabelInfoDB = db_env.open_db(b'IdLabelInfoDB', create=True)
 trackIdMemIdDictDB = db_env.open_db(b'trackIdMemIdDictDB', create=True)
 
-# static_path = join(cwd, 'static')
-
-
-# gif_path = join(static_path, 'Gif_output')
-# hls_path = join(static_path, 'Hls_output')
-
-# known_whitelist_faces = []
-# known_whitelist_id = []
-# known_blacklist_faces = []
-# known_blacklist_id = []
-
-# def load_lmdb_list():
-#     known_whitelist_faces1, known_whitelist_id1 = attendance_lmdb_known()
-#     known_blacklist_faces1, known_blacklist_id1 = attendance_lmdb_unknown()
-#     global known_whitelist_faces
-#     known_whitelist_faces = known_whitelist_faces1
-#     global known_whitelist_id
-#     known_whitelist_id = known_whitelist_id1
-#     global known_blacklist_faces
-#     known_blacklist_faces = known_blacklist_faces1
-#     global known_blacklist_id
-#     known_blacklist_id = known_blacklist_id1
-#     # print("in ",known_whitelist_id,known_blacklist_id)
-
-
-def draw_bounding_boxes(image, obj_meta, confidence):
+def draw_bounding_boxes(image, obj_meta, confidence, label_str, bbox_color):
     confidence = '{0:.2f}'.format(confidence)
     rect_params = obj_meta.rect_params
     top = int(rect_params.top)
@@ -147,27 +122,35 @@ def draw_bounding_boxes(image, obj_meta, confidence):
     width = int(rect_params.width)
     height = int(rect_params.height)
     
-    # obj_name = pgie_classes_str[obj_meta.class_id]
     obj_name = obj_meta.obj_label
     # image = cv2.rectangle(image, (left, top), (left + width, top + height), (0, 0, 255, 0), 2, cv2.LINE_4)
-    color = (0, 0, 255, 0)
-    w_percents = int(width * 0.05) if width > 100 else int(width * 0.1)
-    h_percents = int(height * 0.05) if height > 100 else int(height * 0.1)
+    color = frame_bbox_color[bbox_color]
+    w_percents = int(width * 0.03) if width > 100 else int(width * 0.05)
+    h_percents = int(height * 0.03) if height > 100 else int(height * 0.05)
     linetop_c1 = (left + w_percents, top)
     linetop_c2 = (left + width - w_percents, top)
-    image = cv2.line(image, linetop_c1, linetop_c2, color, 6)
+    image = cv2.line(image, linetop_c1, linetop_c2, color, 2)
     linebot_c1 = (left + w_percents, top + height)
     linebot_c2 = (left + width - w_percents, top + height)
-    image = cv2.line(image, linebot_c1, linebot_c2, color, 6)
+    image = cv2.line(image, linebot_c1, linebot_c2, color, 2)
     lineleft_c1 = (left, top + h_percents)
     lineleft_c2 = (left, top + height - h_percents)
-    image = cv2.line(image, lineleft_c1, lineleft_c2, color, 6)
+    image = cv2.line(image, lineleft_c1, lineleft_c2, color, 2)
     lineright_c1 = (left + width, top + h_percents) 
     lineright_c2 = (left + width, top + height - h_percents)
-    image = cv2.line(image, lineright_c1, lineright_c2, color, 6)
+    image = cv2.line(image, lineright_c1, lineright_c2, color, 2)
+    
+    # Calculate the coordinates for the background polygon
+    text_size, _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+    text_width, text_height = text_size
+    bg_left = left - 10
+    bg_top = top - 10
+    bg_right = bg_left + text_width + 20
+    bg_bottom = bg_top + text_height + 20
+    
     # Note that on some systems cv2.putText erroneously draws horizontal lines across the image
-    image = cv2.putText(image, obj_name, (left - 10, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                        (0, 0, 255, 0), 2)
+    image = cv2.putText(image, label_str, (left - 10, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        color, 2)
     return image
 
 def crop_object(image, obj_meta):
@@ -233,7 +216,27 @@ def fetch_member_info(detect_type):
         value = db_txn.get(key.encode())
         if value is not None:
             data = json.loads(value.decode())
-            print("FETCH MEMBER: ", data)
+            for key, value in data.items():
+                memID = (data[key])[-1]
+                
+                if memID is not None:
+                    if memID == '100':
+                        if memID in track_type:
+                            member_track_type = track_type[memID]
+                    else:
+                        mem_type = memID[:2]
+                        if mem_type in track_type:
+                            member_track_type = track_type[mem_type]
+                else:
+                    member_track_type = None
+                
+                if member_track_type is None:
+                    sentence = f"{detect_type}"
+                else:
+                    sentence = f"{member_track_type} {detect_type}"
+
+                output_dict[key] = sentence
+            return output_dict
         else:
             return None
 
@@ -314,6 +317,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
         l_obj=frame_meta.obj_meta_list
         # print(dev_id_dict[camera_id])
         n_frame_bbox = None
+        output_lbl = None
         while l_obj is not None:
             try:
                 # Casting l_obj.data to pyds.NvDsObjectMeta
@@ -328,9 +332,9 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                 width = rect_params.width
                 height = rect_params.height
                 
-                print("DETECT TYPE: ", detect_type)
-                
+                print(obj_meta.unique_component_id, PRIMARY_DETECTOR_UID_1, SECONDARY_DETECTOR_UID_1, detect_type, anomaly_objs)
                 if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
+                    bbox_color = "green"
                     rect_params.has_bg_color = 1
                     rect_params.border_color.red = 0.0
                     rect_params.border_color.green = 1.0
@@ -343,6 +347,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     
                     
                 if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_1):
+                    bbox_color = "blue"
                     rect_params.has_bg_color = 1
                     rect_params.border_color.red = 0.0
                     rect_params.border_color.green = 0.0
@@ -357,6 +362,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     text_params.display_text = detect_type
                     
                     if detect_type in anomaly_objs:
+                        bbox_color = "red"
                         rect_params.has_bg_color = 1
                         rect_params.border_color.red = 1.0
                         rect_params.border_color.green = 0.0
@@ -366,16 +372,6 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                         rect_params.bg_color.green = 0.0
                         rect_params.bg_color.blue = 0.0
                         rect_params.bg_color.alpha = 0.3
-
-                n_frame_bbox = None
-                n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence)
-                # cv2.imwrite(f'{infer_path}/{frame_number}.jpg',n_frame_bbox)
-                
-                n_frame_crop = crop_object(n_frame, obj_meta)
-                frame_crop_copy = cv2.cvtColor(n_frame_crop, cv2.COLOR_RGBA2BGRA)
-                frame_crop = cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB)
-                # if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_2):
-                    # cv2.imwrite(f'{crop_path}/{frame_number}.jpg',frame_crop)
                 
                 parent  = obj_meta.parent
 
@@ -383,32 +379,38 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     obj_id = parent.object_id
                 else :
                     obj_id  =  int(obj_meta.object_id)
-                    
-                # print("OBJECT ID: ", obj_id)
                 
                 if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
-                    # if 'Activity' in subscriptions:
-                        # output_lbl = fetch_activity_info(detect_type)
-                    # else:
-                    #     print("MEMBER SUBSCRIBED")
-                    #     out = fetch_member_info(detect_type)
-                    output_lbl = fetch_activity_info(detect_type)
-                    # print("###################################################")
-                    # print("###################################################")
-                    # print("###################################################")
-                    # print("###################################################")
-                    # print("OBJECT ID: ", obj_id)
-                    # print(output_lbl)
+                    if 'Activity' in subscriptions:
+                        output_lbl = fetch_activity_info(detect_type)
+                    else:
+                        output_lbl = fetch_member_info(detect_type)
+                        
                     if output_lbl is not None:
                         if len(output_lbl)!=0:
                             obj_id_str = str(obj_id)
                             if obj_id_str in output_lbl:
-                                print(output_lbl[obj_id_str])
                                 text_params.display_text = output_lbl[obj_id_str]
-                    # print("###################################################")
-                    # print("###################################################")
-                    # print("###################################################")
-                    # print("###################################################")
+                                
+                n_frame_bbox = None
+                
+                if output_lbl is not None and len(output_lbl)!=0:
+                    obj_id_str = str(obj_id)
+                    if obj_id_str in output_lbl:
+                        n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence, output_lbl[obj_id_str], bbox_color)
+                    else:
+                        n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence, detect_type, bbox_color)
+                else:
+                    n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence, detect_type, bbox_color)
+                    
+                        
+                cv2.imwrite(f'{infer_path}/{frame_number}.jpg',n_frame_bbox)
+                
+                n_frame_crop = crop_object(n_frame, obj_meta)
+                frame_crop_copy = cv2.cvtColor(n_frame_crop, cv2.COLOR_RGBA2BGRA)
+                frame_crop = cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB)
+                # if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_2):
+                    # cv2.imwrite(f'{crop_path}/{frame_number}.jpg',frame_crop)
 
 
                 if obj_id not in age_dict:
@@ -431,7 +433,6 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     'crop' : cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB),
                     'age' : age_dict[obj_id]
                     }
-                    print(obj_dict['detect_type'])
                     if detect_type in constantIdObjects:
                         obj_dict['obj_id'] = 1
                     frame_dict['objects'].append(obj_dict)
@@ -731,12 +732,13 @@ def main(server, args):
         if key == 'll-config-file' :
             tracker_ll_config_file = config.get('tracker', key)
             tracker.set_property('ll-config-file', tracker_ll_config_file)
-        if key == 'enable-batch-process' :
-            tracker_enable_batch_process = config.getint('tracker', key)
-            tracker.set_property('enable_batch_process', tracker_enable_batch_process)
-        if key == 'enable-past-frame' :
-            tracker_enable_past_frame = config.getint('tracker', key)
-            tracker.set_property('enable_past_frame', tracker_enable_past_frame)
+        if not is_aarch64():
+            if key == 'enable-batch-process' :
+                tracker_enable_batch_process = config.getint('tracker', key)
+                tracker.set_property('enable_batch_process', tracker_enable_batch_process)
+            if key == 'enable-past-frame' :
+                tracker_enable_past_frame = config.getint('tracker', key)
+                tracker.set_property('enable_past_frame', tracker_enable_past_frame)
 
 #############################################################################################################
     pgie1.set_property('config-file-path', pgie1_path)
