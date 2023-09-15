@@ -58,6 +58,7 @@ async def cb(msg):
 
 async def face_update_main():
     #await member_video_ipfs(member_did, member_name, member_cid)
+    # nc = await nats.connect(servers=nats_urls , reconnect_time_wait= 50 ,allow_reconnect=True, connect_timeout=20, max_reconnect_attempts=60)
     await nc.connect(servers=["nats://216.48.181.154:5222"] , reconnect_time_wait= 50 ,allow_reconnect=True, connect_timeout=20, max_reconnect_attempts=60)
     # sub = await nc.subscribe("member.update.*", cb=cb)
     sub = await nc.subscribe("member.update.faceid", cb=cb)
