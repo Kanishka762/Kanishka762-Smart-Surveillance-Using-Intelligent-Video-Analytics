@@ -48,6 +48,7 @@ def fetch_db_mem():
         inn_dict = {}
         member_info={}
         member_info['id'] = row[0]
+        member_info['updated'] = False
         member_info["member"] = []
         inn_dict['memberId'] = row[0]
         inn_dict['type'] = row[1]

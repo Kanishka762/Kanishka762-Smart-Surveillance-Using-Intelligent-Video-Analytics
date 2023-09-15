@@ -13,16 +13,24 @@ from modules.db.db_fetch_members import fetch_db_mem
 # from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
 # from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
 from modules.components.rtsp_check import check_rtsp_stream
+from modules.face_recognition_pack.membersSubscriber import startMemberService
+from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
+
+import queue
+# global_lock = threading.Lock()
+#/home/srihari/deepstreambackend/modules/face_recognition_pack/membersSubscriber.py
+
+mem_data_queue = queue.Queue()
 # cwd = os.getcwd()
 # data_path = join(cwd, 'data')
 # dotenv_path = join(data_path, '.env')
 
 load_dotenv(dotenv_path)
 
-rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
+# rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
 # subscriptions = ast.literal_eval(os.getenv("subscriptions"))
 
-def create_device_dict(mem_data_queue):
+def create_device_dict():
     
     # if 'Face-Recognition' in subscriptions:
     #     load_lmdb_list()
@@ -48,22 +56,24 @@ def create_device_dict(mem_data_queue):
             device_dict["port"] = chunk[5]
             device_dict["videoEncodingInformation"] = 'H265'
             device_dict["username"] = chunk[7]
-            # device_dict["rtsp"] = chunk[8]
-            device_dict["rtsp"] = rtsp_links[i]
-            # device_dict["rtsp"] = "file:///home/development/Videos/Sample_10/2.mp4"
+            device_dict["rtsp"] = chunk[8]
+            # device_dict["rtsp"] = rtsp_links[i]
+            # device_dict["rtsp"] = "file:///home/srihari/facerecog.mp4"
             # device_dict["rtsp"] = "rtsp://test:test123456789@streams.ckdr.co.in:2554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
             device_dict["password"] = chunk[9]
-            # device_dict["subscriptions"] = chunk[10]
-            device_dict["subscriptions"] = ['Activity', 'Facial-Recognition']#'Facial-Recognition', 'Activity'
+            device_dict["subscriptions"] = chunk[10]
+            # device_dict["subscriptions"] = ['Activity', 'Facial-Recognition']#'Facial-Recognition', 'Activity'
             device_dict["lat"] = chunk[11]
             device_dict["long"] = chunk[12]
             dev_details.append(device_dict)
-        if (i==1):
-            break
+        # if (i==1):
+        #     break
 
     for devs in dev_details:
         # print(devs["subscriptions"])
         if 'Facial-Recognition' in devs["subscriptions"]:
+            threading.Thread(target = startMemberService, args=(mem_data_queue,)).start()
+            threading.Thread(target=load_lmdb_fst, args=(mem_data_queue,)).start()
             # load_lmdb_list()
             print("removed lmdb contents")
             #fetching members data from postgres
