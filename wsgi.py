@@ -9,7 +9,7 @@ from gi.repository import Gst, GstRtspServer, GLib
 
 from init import *
 from modules.components.load_paths import *
-from modules.deepstream.rtsp2frames import main
+from modules.deepstream.rtsp2rtsp import main
 from modules.components.structure_dev_dict import create_device_dict
 from modules.db.db_push import gif_push
 from modules.data_process.frame_data_process import frame_2_dict
@@ -19,7 +19,7 @@ load_dotenv(dotenv_path)
 #/home/srihari/deepstreambackend/modules/face_recognition_pack/membersSubscriber.py
 
 mem_data_queue = queue.Queue()
-rtsp_port = os.getenv("RTSP_PORT")
+rtsp_port = os.getenv("rtsp_port")
 if rtsp_port is not None and rtsp_port.isdigit():
     rtsp_port_int = int(rtsp_port)
 
@@ -38,5 +38,5 @@ if __name__ == '__main__':
     # p.start()
     dev_details = create_device_dict()
     print(dev_details)
-    main(dev_details)
+    main(server, dev_details)
 
