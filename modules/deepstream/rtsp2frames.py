@@ -1,28 +1,4 @@
 
-#!/usr/bin/env python3
-
-################################################################################
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-################################################################################
-
 from modules.components.load_paths import *
 import sys
 sys.path.append('../')
@@ -329,7 +305,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                 top = rect_params.top
                 width = rect_params.width
                 height = rect_params.height
-                
+                # print('detect_type',detect_type)
                 if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
                     bbox_color = "green"
                     rect_params.has_bg_color = 1
@@ -342,7 +318,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     rect_params.bg_color.blue = 0.0
                     rect_params.bg_color.alpha = 0.3
                     
-                    
+                # print(obj_meta.unique_component_id,SECONDARY_DETECTOR_UID_1)
                 if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_1):
                     bbox_color = "blue"
                     rect_params.has_bg_color = 1
@@ -560,12 +536,12 @@ def main(args):
     
     print(args)
     global dev_id_dict
-    # Check input arguments
+
     past_tracking_meta[0]=1
     number_sources=len(args)
     print(number_sources)
 
-    # Standard GStreamer initialization
+
     GObject.threads_init()
     Gst.init(None)
 

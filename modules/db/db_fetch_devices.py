@@ -1,16 +1,14 @@
 from modules.components.load_paths import *
+from init import loadLogger
 import psycopg2
 from pytz import timezone 
 from datetime import datetime
-#.env vars loaded
+
 import os
 from os.path import join, dirname
 from dotenv import load_dotenv
 import ast
-
-# cwd = os.getcwd()
-# data_path = join(cwd, 'data')
-# dotenv_path = join(data_path, '.env')
+logger = loadLogger()
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
@@ -22,7 +20,7 @@ pguser = os.getenv("pguser")
 pgpassword = os.getenv("pgpassword")
 tenant_ids = os.getenv("TENANT_IDS")
 
-print(pg_url, pgdb, pgport, pguser, pgpassword)
+# print(pg_url, pgdb, pgport, pguser, pgpassword)
 
 def fetch_db():
     try:
@@ -41,26 +39,33 @@ def fetch_db():
             ;'''
         cursor.execute(query)
         connection.commit()
-        print("Selecting rows from device table using cursor.fetchall")
+        logger.info("Selecting rows from device table using cursor.fetchall")
         device_records = cursor.fetchall()
         return(device_records)
     except (Exception, psycopg2.Error) as error:
-        print("Error while fetching data from PostgreSQL", error)
+        # print("Error while fetching data from PostgreSQL", error)
+        logger.error("Error while fetching data from PostgreSQL", exc_info=error)
+
         connection.rollback()  # rollback the transaction if an error occurs
     finally:
         # closing database connection.
         if connection:
             cursor.close()
             connection.close()
-            print("PostgreSQL connection is closed")
+            logger.info("PostgreSQL connection is closed")
 
 def filter_devices():
-    dev_det = fetch_db()
-    updated_device_det =[]
-    for i in range(len(dev_det)):
-        if dev_det[i][1] in tenant_ids:
-            updated_device_det.append(dev_det[i])
-    return updated_device_det
+    try:
+        dev_det = fetch_db()
+        updated_device_det =[]
+        for i in range(len(dev_det)):
+            if dev_det[i][1] in tenant_ids:
+                updated_device_det.append(dev_det[i])
+        return updated_device_det
+    except Exception as e:
+        logger.error("An error occurred while filtering devices", exc_info=e)
+
+
 
 
 

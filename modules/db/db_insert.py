@@ -142,7 +142,7 @@ def dbpush_activities(act_out):
         'location': str(loc_name), 
         'title': title, 
         'timestamp': act_out['timestamp'], 
-        'score': act_out['metaData']['frameAnomalyScore'], 
+        'score': None, 
         'deviceId': act_out['deviceid'],
         'uri1': act_out['metaData']['cid'],
         'thumbnailId': None, 

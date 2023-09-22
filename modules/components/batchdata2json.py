@@ -56,7 +56,7 @@ def output_func(my_list,device_id,device_timestamp):
     my_list = [my_list]
     frames=[]               # this variable will hold the frame_id of all the frames in which a atleast one detection was made"
     ids_to_be_monitored=[]  #re-id of all the person type detection with anamoly score>50
-    frame_anamoly_wgt = []
+    # frame_anamoly_wgt = []
     person_counts = {}
     vehicle_counts = {}
     object_counts = {}
@@ -122,7 +122,7 @@ def output_func(my_list,device_id,device_timestamp):
 
     for x in my_list:
         for item in x:
-            frame_anamoly_wgt.append(item['frame_anamoly_wgt'])
+            # frame_anamoly_wgt.append(item['frame_anamoly_wgt'])
             frame_id = item['frame_id']
             detection_info = item['detection_info']
             if detection_info ==[]:
@@ -288,7 +288,7 @@ def output_func(my_list,device_id,device_timestamp):
 
     metaBatch = {
         "detect": (count_all),
-        "frameAnomalyScore" : frame_anamoly_wgt,
+        # "frameAnomalyScore" : frame_anamoly_wgt,
         "count": {"peopleCount": (count_p),
                   "vehicleCount": (count_v),
                   "ObjectCount" : (count_o),

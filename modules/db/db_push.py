@@ -1,7 +1,5 @@
 from modules.components.load_paths import *
-
-import subprocess as sp
-from os.path import join, dirname
+from init import loadLogger
 from dotenv import load_dotenv
 import time
 import os
@@ -12,9 +10,9 @@ import cv2
 from psycopg2 import sql
 import asyncio 
 from modules.gif.gif_creation import result_queue
-# cwd = os.getcwd()
-# data_path = join(cwd, 'data')
-# dotenv_path = join(data_path, '.env')
+
+logger = loadLogger()
+
 load_dotenv(dotenv_path)
 
 ipfs_url = os.getenv("ipfs")
@@ -26,131 +24,146 @@ pguser = os.getenv("pguser")
 pgpassword = os.getenv("pgpassword")
 ddns_env = os.getenv("DDNS_NAME")
 num = 0
+
 def gst_hls_push(deviceInfo):
-    
-    for item in deviceInfo:
-        
-        if item == '':
-            continue
-        
-        device_id = item['deviceId']
-        ddns_name = item['ddns']
-        if(ddns_name == None):
-            hostname = ddns_env
-        else:
-            hostname = ddns_name
-            
-        hls_url = f'https://{hostname}/live/{device_id}/{device_id}.m3u8'        
-        # Define the update statement
-        query='''UPDATE "DeviceMetaData" SET uri=%s WHERE "deviceId"=%s;'''
-            
+    if len(deviceInfo) > 0:
+        for item in deviceInfo:
+            try:
+                if item == '':
+                    continue
+
+                device_id = item['deviceId']
+                ddns_name = item['ddns']
+
+                hostname = ddns_env if ddns_name is None else ddns_name
+                #TODO: 
+                #move to .env 
+                hls_url = f'https://{hostname}/live/{device_id}/{device_id}.m3u8'   
+
+                query='''UPDATE "DeviceMetaData" SET uri=%s WHERE "deviceId"=%s;'''
+                logger.info("created variables for gst_hls_push")
+
+            except Exception as e:
+                logger.error("error in creating variables for gst_hls_push", exc_info=e)
+
+            try:
+
+                connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
+
+                cursor=connection.cursor()     
+
+                cursor.execute(query, (hls_url, device_id))           
+
+                connection.commit()
+                cursor.close()
+                connection.close()    
+                logger.info("Updated the uri column in device table")
+            except psycopg2.errors.SerializationFailure as e:
+                _extracted_from_gst_hls_push_64(
+                    "Transaction serialization failure: ",
+                    e,
+                    connection,
+                    cursor,
+                )
+                #TODO: 
+                #move to .env 
+                max_retries = 5
+                delay = 0.2
+                retry_count = 0
+
+                while retry_count < max_retries:
+                    logger.info(f"Retrying transaction after {delay} seconds...")
+                    time.sleep(delay)
+                    try:
+                        # Establish a connection to the PostgreSQL database
+                        connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
+                        # Create a cursor object
+                        cursor=connection.cursor()
+                        # Execute the update statement with the specified values
+                        cursor.execute(query, (hls_url, device_id))
+                        connection.commit()
+                        cursor.close()
+                        connection.close() 
+                        logger.info("Transaction succeeded on retry")
+                    except psycopg2.errors.SerializationFailure as e:
+                        _extracted_from_gst_hls_push_64(
+                            "Transaction serialization failure:",
+                            e,
+                            connection,
+                            cursor,
+                        )
+                        delay *= 2
+                        retry_count += 1
+                    except Exception as e:
+                        _extracted_from_gst_hls_push_64(
+                            "Postges error occured: ", e, connection, cursor
+                        )
+                        return
+                logger.info("Transaction failed after maximum retries")
+
+            except Exception as e:
+                _extracted_from_gst_hls_push_64(
+                    "Postges error occured: ", e, connection, cursor
+                )
+                return
+                            #time.sleep(15)
+    else:
         try:
-            # Establish a connection to the PostgreSQL database
-            connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
-            # Create a cursor object
-            cursor=connection.cursor()     
-            # Execute the update statement with the specified values
-            cursor.execute(query, (hls_url, device_id))           
-            # Commit the changes and close the connection
-            connection.commit()
-            cursor.close()
-            connection.close()    
-            print("Updated the uri column in device table")
-        except psycopg2.errors.SerializationFailure as e:
-            # If the transaction encounters a serialization failure, retry with exponential backoff
-            print(f"Transaction serialization failure: {e}")
-            connection.rollback()
-            cursor.close()
-            connection.close()
-            max_retries = 5
-            delay = 0.2
-            retry_count = 0
-            while retry_count < max_retries:
-                print(f"Retrying transaction after {delay} seconds...")
-                time.sleep(delay)
-                try:
-                    # Establish a connection to the PostgreSQL database
-                    connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
-                    # Create a cursor object
-                    cursor=connection.cursor()
-                    # Execute the update statement with the specified values
-                    cursor.execute(query, (hls_url, device_id))
-                    connection.commit()
-                    cursor.close()
-                    connection.close() 
-                    print("Transaction succeeded on retry")
-                except psycopg2.errors.SerializationFailure as e:
-                    print(f"Transaction serialization failure: {e}")
-                    connection.rollback()
-                    cursor.close()
-                    connection.close()
-                    delay *= 2
-                    retry_count += 1
-                except Exception as e:
-                    print("Postges error occured: ", e)
-                    connection.rollback()
-                    cursor.close()
-                    connection.close()
-                    return
-            print("Transaction failed after maximum retries")
-        
+            raise Exception("there are no devices in deviceInfo")
         except Exception as e:
-            print("Postges error occured: ", e)
-            connection.rollback()
-            cursor.close()
-            connection.close()
-            return
-            #time.sleep(15)
+            logger.error("", exc_info=e)
+
+
+# TODO Rename this here and in `gst_hls_push`
+def _extracted_from_gst_hls_push_64(arg0, e, connection, cursor):
+    logger.error(arg0, exc_info=e)
+    connection.rollback()
+    cursor.close()
+    connection.close()
 
 def gif_push():
+
     while True:
-        print("started listning to thumbnail")
+        try:
+            logger.info("started listning to thumbnail")
+            # logger.info("creating variables for gif push")
+            global result_queue
+            file_path, device_info, gifBatch, gif_cid = result_queue.get()
 
-        global result_queue
-        file_path, device_info, gifBatch, gif_cid = result_queue.get()
-        # print(file_path, device_info, gifBatch, gif_cid)
-        deviceId = device_info['deviceId']
-        tenantId = device_info['tenantId']
+            deviceId = device_info['deviceId']
+            tenantId = device_info['tenantId']
         
-        # print("LENGTH OF THE BATCH: ", len(gifBatch))
-        # with imageio.get_writer(file_path, mode="I") as writer:
-        #     for idx, frame in enumerate(gifBatch):
-        #         print("FRAME: ", idx)
-        #         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        #         writer.append_data(rgb_frame)
+            img_timestamp = str(datetime.now(timezone("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S.%f'))
+            
+            img_name = f"THUMBNAIL_{img_timestamp}"
+            
+            # print(f"IMAGE TIMESTAMP : {img_timestamp}")
+            logger.info("created variables for gif push")
+        except Exception as e:
+            logger.error("error in creating variables for gif push", exc_info=e)
 
-        # command = f'ipfs --api={ipfs_url} add {file_path} -Q'
-        # gif_cid = sp.getoutput(command)
-        # print("GIF CID: ", gif_cid)
-        
-        img_timestamp = str(datetime.now(timezone("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S.%f'))
-        
-        img_name = f"THUMBNAIL_{img_timestamp}"
-        
-        print(f"IMAGE TIMESTAMP : {img_timestamp}")
+
         
         try:
-            # Establish a connection to the PostgreSQL database
+            # logger.info("created variables for gif push")
             connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
-            # Create a cursor object
             cursor=connection.cursor()  
-            # num = num+1 
-            # result_id = num
-            # cursor.execute(f"SELECT pg_advisory_lock({result_id})")
+        except Exception as e:
+            logger.error("error while establishing connection to DB", exc_info=e)
+        
+        try:
             cursor.execute(sql.SQL("SELECT COUNT(*) FROM {} WHERE {} = %s;").format(sql.Identifier("Thumbnails"), sql.Identifier("deviceId")), [deviceId])
             row_count = cursor.fetchone()[0]
-            
-            print("COUNT: ", row_count)
-            
+
             if row_count > 0:
-                # Fetch the id of the matching row in Thumbnails table
+                
                 cursor.execute(sql.SQL("SELECT id FROM {} WHERE {} = %s;").format(sql.Identifier("Thumbnails"), sql.Identifier("deviceId")), [deviceId])
                 thumbnail_id = cursor.fetchone()[0]
                 
-                print("THUMBNAIL ID: ", thumbnail_id)
+                logger.info(f"THUMBNAIL ID: {thumbnail_id}")
                 # Update the uri column in Images table where thumbnailId matches the fetched id
                 cursor.execute(sql.SQL("UPDATE {} SET uri = %s, {} = %s, {} = %s, {} = %s WHERE {} = %s").format(sql.Identifier("Images"),sql.Identifier("timeStamp"),sql.Identifier("createdAt"),sql.Identifier("updatedAt"), sql.Identifier("thumbnailId")), [str(gif_cid), img_timestamp, img_timestamp, img_timestamp, thumbnail_id])
-                print("Updated the Thumbnail column")
+                logger.info("Updated the Thumbnail column")
             else:
                 query = """
                             WITH inserted_thumbnail AS (
@@ -175,7 +188,7 @@ def gif_push():
                     'activityId': None, 
                     'logId': None
                     })
-                print("Inserted the Thumbnail column")
+                logger.info("Inserted the Thumbnail column")
             # cursor.execute(f"SELECT pg_advisory_unlock({result_id})")
             # Commit the changes and close the connection
             connection.commit()
@@ -184,15 +197,17 @@ def gif_push():
                  
         except psycopg2.errors.SerializationFailure as e:
             # If the transaction encounters a serialization failure, retry with exponential backoff
-            print(f"Transaction serialization failure: {e}")
+            logger.error("Transaction serialization failure", exc_info=e)
             connection.rollback()
             cursor.close()
             connection.close()
+            #TODO: 
+            #move to .env 
             max_retries = 5
             delay = 0.2
             retry_count = 0
             while retry_count < max_retries:
-                print(f"Retrying transaction after {delay} seconds...")
+                logger.info(f"Retrying transaction after {str(delay)} seconds...")
                 time.sleep(delay)
                 try:
                     # Establish a connection to the PostgreSQL database
@@ -204,17 +219,17 @@ def gif_push():
                     cursor.execute(sql.SQL("SELECT COUNT(*) FROM {} WHERE {} = %s;").format(sql.Identifier("Thumbnails"), sql.Identifier("deviceId")), [deviceId])
                     row_count = cursor.fetchone()[0]
                     
-                    print("COUNT: ", row_count)
+                    logger.info(f"COUNT:{str(row_count)}")
                     
                     if row_count > 0:
                         # Fetch the id of the matching row in Thumbnails table
                         cursor.execute(sql.SQL("SELECT id FROM {} WHERE {} = %s;").format(sql.Identifier("Thumbnails"), sql.Identifier("deviceId")), [deviceId])
                         thumbnail_id = cursor.fetchone()[0]
                         
-                        print("THUMBNAIL ID: ", thumbnail_id)
+                        logger.info(f"THUMBNAIL ID: {str(thumbnail_id)}")
                         # Update the uri column in Images table where thumbnailId matches the fetched id
                         cursor.execute(sql.SQL("UPDATE {} SET uri = %s, {} = %s, {} = %s, {} = %s WHERE {} = %s").format(sql.Identifier("Images"),sql.Identifier("timeStamp"),sql.Identifier("createdAt"),sql.Identifier("updatedAt"), sql.Identifier("thumbnailId")), [str(gif_cid), img_timestamp, img_timestamp, img_timestamp, thumbnail_id])
-                        print("Updated the Thumbnail column")
+                        logger.info("Updated the Thumbnail column")
                     else:
                         query = """
                                     WITH inserted_thumbnail AS (
@@ -239,13 +254,13 @@ def gif_push():
                             'activityId': None, 
                             'logId': None
                             })
-                        print("Inserted the Thumbnail column")
+                        logger.info("Inserted the Thumbnail column")
                     connection.commit()
                     cursor.close()
                     connection.close() 
-                    print("Transaction succeeded on retry")
+                    logger.info("Transaction succeeded on retry")
                 except psycopg2.errors.SerializationFailure as e:
-                    print(f"Transaction serialization failure: {e}")
+                    logger.error(f"Transaction serialization failure",exc_info=e)
                     connection.rollback()
                     cursor.close()
                     connection.close()
@@ -253,16 +268,16 @@ def gif_push():
                     retry_count += 1
                     
                 except Exception as e:
-                    print("Postges error occured: ", e)
+                    logger.error("Postges error occured: ", exc_info=e)
                     connection.rollback()
                     cursor.close()
                     connection.close()
                     
                     return
-                print("Transaction failed after maximum retries")
+                logger.info("Transaction failed after maximum retries")
             
         except Exception as e:
-            print("Postges error occured: ", e)
+            logger.error("Postges error occured: ", exc_info=e)
             connection.rollback()
             cursor.close()
             connection.close()
