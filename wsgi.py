@@ -19,7 +19,7 @@ load_dotenv(dotenv_path)
 #/home/srihari/deepstreambackend/modules/face_recognition_pack/membersSubscriber.py
 
 mem_data_queue = queue.Queue()
-rtsp_port = os.getenv("RTSP_PORT")
+rtsp_port = os.getenv("rtsp_port")
 if rtsp_port is not None and rtsp_port.isdigit():
     rtsp_port_int = int(rtsp_port)
 

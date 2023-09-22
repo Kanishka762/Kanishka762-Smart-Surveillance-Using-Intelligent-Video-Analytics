@@ -24,30 +24,23 @@
 ################################################################################
 
 from modules.components.load_paths import *
-import argparse
 import sys
 sys.path.append('../')
 import ast
 import os
-from os.path import join, dirname
-import time
-import threading
-import random
-import string
 import gi
 import configparser
 gi.require_version('Gst', '1.0')
+gi.require_version("GstRtspServer", "1.0")
+from gi.repository import Gst, GstRtspServer, GLib
 from gi.repository import GObject, Gst
 from gi.repository import GLib
 from ctypes import *
 # import sys
-import math
-import platform
 from common.is_aarch_64 import is_aarch64
 from common.bus_call import bus_call
 from datetime import datetime
 import datetime
-import shutil
 import pyds
 import pytz
 # import datetime
@@ -55,6 +48,9 @@ import numpy as np
 import cv2
 import asyncio
 from dotenv import load_dotenv
+import lmdb
+import json
+import threading
 
 from modules.gif.gif_creation import gif_build
 from modules.db.db_push import gif_push, gst_hls_push
@@ -75,18 +71,21 @@ tenant_name = os.getenv("tenant_name")
 ddns_name = os.getenv("DDNS_NAME")
 place = os.getenv("place")
 obj_det_labels = ast.literal_eval(os.getenv("obj_det_labels"))
-# print("_)(*&^%$#@@#$%^&*()(*&^%$#@#$%^&*()))")
-# print('obj_det_labels',obj_det_labels)
-# print("_)(*&^%$#@@#$%^&*()(*&^%$#@#$%^&*()))")
-
+anomaly_objs = ast.literal_eval(os.getenv("anamoly_object"))
 classDict = ast.literal_eval(os.getenv("classDict"))
 constantIdObjects = ast.literal_eval(os.getenv("constantIdObjects"))
+track_type = ast.literal_eval(os.getenv("track_type"))
+frame_bbox_color = ast.literal_eval(os.getenv("color"))
 
 timezone = pytz.timezone(f'{place}')  #assign timezone
 pgie1_path = cwd + f"/models_deepstream/{tenant_name}/{device}/gender/config.txt"
 pgie2_path = cwd + f"/models_deepstream/{tenant_name}/{device}/fire/config.txt"
 sgie1_path = cwd + f"/models_deepstream/{tenant_name}/{device}/face_detect/config.txt"
 sgie2_path = cwd + f"/models_deepstream/{tenant_name}/{device}/dangerous_object/config.txt"
+frame_path = cwd + "/static/frames/"
+infer_path = cwd + "/static/image/"
+crop_path = cwd + "/static/crops/"
+
 age_dict = {}
 dev_id_dict = {}
 gif_dict = {}
@@ -97,44 +96,23 @@ label_dict = {}
 for i,label in enumerate(obj_det_labels):
     label_dict[label] = i 
 
-# PGIE_CLASS_ID_MALE = 0
-# PGIE_CLASS_ID_FEMALE = 1
-# PGIE_CLASS_ID_FIRE = 2
-# PGIE_CLASS_ID_SMOKE = 3
-# PGIE_CLASS_ID_GUN = 4
-# PGIE_CLASS_ID_KNIFE = 5
+PRIMARY_DETECTOR_UID_1 = 1
+PRIMARY_DETECTOR_UID_2 = 2
+SECONDARY_DETECTOR_UID_1 = 3
+SECONDARY_DETECTOR_UID_2 = 4
 
 past_tracking_meta=[0]
 OSD_PROCESS_MODE= 0
 OSD_DISPLAY_TEXT= 1
 pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
+BITRATE  = 4000000
 
-# static_path = join(cwd, 'static')
+db_env = lmdb.open(lmdb_path+'/face-detection',
+                max_dbs=10)
+IdLabelInfoDB = db_env.open_db(b'IdLabelInfoDB', create=True)
+trackIdMemIdDictDB = db_env.open_db(b'trackIdMemIdDictDB', create=True)
 
-
-# gif_path = join(static_path, 'Gif_output')
-# hls_path = join(static_path, 'Hls_output')
-
-# known_whitelist_faces = []
-# known_whitelist_id = []
-# known_blacklist_faces = []
-# known_blacklist_id = []
-
-# def load_lmdb_list():
-#     known_whitelist_faces1, known_whitelist_id1 = attendance_lmdb_known()
-#     known_blacklist_faces1, known_blacklist_id1 = attendance_lmdb_unknown()
-#     global known_whitelist_faces
-#     known_whitelist_faces = known_whitelist_faces1
-#     global known_whitelist_id
-#     known_whitelist_id = known_whitelist_id1
-#     global known_blacklist_faces
-#     known_blacklist_faces = known_blacklist_faces1
-#     global known_blacklist_id
-#     known_blacklist_id = known_blacklist_id1
-#     # print("in ",known_whitelist_id,known_blacklist_id)
-
-
-def draw_bounding_boxes(image, obj_meta, confidence):
+def draw_bounding_boxes(image, obj_meta, confidence, label_str, bbox_color):
     confidence = '{0:.2f}'.format(confidence)
     rect_params = obj_meta.rect_params
     top = int(rect_params.top)
@@ -142,27 +120,35 @@ def draw_bounding_boxes(image, obj_meta, confidence):
     width = int(rect_params.width)
     height = int(rect_params.height)
     
-    # obj_name = pgie_classes_str[obj_meta.class_id]
     obj_name = obj_meta.obj_label
     # image = cv2.rectangle(image, (left, top), (left + width, top + height), (0, 0, 255, 0), 2, cv2.LINE_4)
-    color = (0, 0, 255, 0)
-    w_percents = int(width * 0.05) if width > 100 else int(width * 0.1)
-    h_percents = int(height * 0.05) if height > 100 else int(height * 0.1)
+    color = frame_bbox_color[bbox_color]
+    w_percents = int(width * 0.03) if width > 100 else int(width * 0.05)
+    h_percents = int(height * 0.03) if height > 100 else int(height * 0.05)
     linetop_c1 = (left + w_percents, top)
     linetop_c2 = (left + width - w_percents, top)
-    image = cv2.line(image, linetop_c1, linetop_c2, color, 6)
+    image = cv2.line(image, linetop_c1, linetop_c2, color, 2)
     linebot_c1 = (left + w_percents, top + height)
     linebot_c2 = (left + width - w_percents, top + height)
-    image = cv2.line(image, linebot_c1, linebot_c2, color, 6)
+    image = cv2.line(image, linebot_c1, linebot_c2, color, 2)
     lineleft_c1 = (left, top + h_percents)
     lineleft_c2 = (left, top + height - h_percents)
-    image = cv2.line(image, lineleft_c1, lineleft_c2, color, 6)
+    image = cv2.line(image, lineleft_c1, lineleft_c2, color, 2)
     lineright_c1 = (left + width, top + h_percents) 
     lineright_c2 = (left + width, top + height - h_percents)
-    image = cv2.line(image, lineright_c1, lineright_c2, color, 6)
+    image = cv2.line(image, lineright_c1, lineright_c2, color, 2)
+    
+    # Calculate the coordinates for the background polygon
+    text_size, _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+    text_width, text_height = text_size
+    bg_left = left - 10
+    bg_top = top - 10
+    bg_right = bg_left + text_width + 20
+    bg_bottom = bg_top + text_height + 20
+    
     # Note that on some systems cv2.putText erroneously draws horizontal lines across the image
-    image = cv2.putText(image, obj_name + ',C=' + str(confidence), (left - 10, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                        (0, 0, 255, 0), 2)
+    image = cv2.putText(image, label_str, (left - 10, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        color, 2)
     return image
 
 def crop_object(image, obj_meta):
@@ -188,30 +174,84 @@ def findClassList(subscriptions):
         subscriptions_class_list.append(each)
     return subscriptions_class_list
     
+def fetch_activity_info(detect_type):
+    key = "IdLabelInfo"
+    output_dict = {}
+    with db_env.begin(db=IdLabelInfoDB, write=True) as db_txn:
+        value = db_txn.get(key.encode())
+        if value is not None:
+            data = json.loads(value.decode())
+            for key, value in data.items():
+                memID = value['memberID']
+                activities = list(set(value['activity']))
+                
+                if memID is not None:
+                    if memID == '100':
+                        if memID in track_type:
+                            member_track_type = track_type[memID]
+                    else:
+                        mem_type = memID[:2]
+                        if mem_type in track_type:
+                            member_track_type = track_type[mem_type]
+                else:
+                    member_track_type = None
+                
+                if member_track_type is None:
+                    sentence = f"{detect_type} {' '.join(activities)}"
+                else:
+                    sentence = f"{member_track_type} {detect_type} {' '.join(activities)}"
 
+                output_dict[key] = sentence
+            
+            return output_dict
+        else:
+            return None
+        
+def fetch_member_info(detect_type):
+    key = "trackIdMemIdDict"
+    output_dict = {}
+    with db_env.begin(db=trackIdMemIdDictDB, write=True) as db_txn:
+        value = db_txn.get(key.encode())
+        if value is not None:
+            data = json.loads(value.decode())
+            for key, value in data.items():
+                memID = (data[key])[-1]
+                
+                if memID is not None:
+                    if memID == '100':
+                        if memID in track_type:
+                            member_track_type = track_type[memID]
+                    else:
+                        mem_type = memID[:2]
+                        if mem_type in track_type:
+                            member_track_type = track_type[mem_type]
+                else:
+                    member_track_type = None
+                
+                if member_track_type is None:
+                    sentence = f"{detect_type}"
+                else:
+                    sentence = f"{member_track_type} {detect_type}"
+
+                output_dict[key] = sentence
+            return output_dict
+        else:
+            return None
 
 def tracker_src_pad_buffer_probe(pad,info,dev_list):
+    
     # print("called callback")
     global gif_dict,cnt
 
     frame_number=0
+    
     #Intiallizing object counter with 0.
-
     obj_counter = {}
-        # PGIE_CLASS_ID_MALE : 0,
-        # PGIE_CLASS_ID_FEMALE : 0,
-        # PGIE_CLASS_ID_FIRE : 0,
-        # PGIE_CLASS_ID_SMOKE : 0,
-        # PGIE_CLASS_ID_GUN : 0,
-        # PGIE_CLASS_ID_KNIFE : 0
-
-    # for label in label_dict:
-    #     obj_counter_label[label] = 0 
+    
     for label in label_dict:
         obj_counter[label_dict[label]] = 0 
     # print(obj_counter)
 
-    num_rects=0
     gst_buffer = info.get_buffer()
     if not gst_buffer:
         print("Unable to get GstBuffer ")
@@ -224,7 +264,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
     
     # buf_surface = pyds.get_nvds_buf_surface(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
-
+    
     while l_frame is not None:
         try:
             # Note that l_frame.data needs a cast to pyds.NvDsFrameMeta
@@ -236,7 +276,6 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
             n_frame = pyds.get_nvds_buf_surface(hash(gst_buffer), frame_meta.batch_id)
             n_frame = cv2.cvtColor(n_frame, cv2.COLOR_BGR2RGB)
             dt = datetime.datetime.now(timezone)
-            
         except StopIteration:
             break
         
@@ -245,10 +284,9 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
         frame_copy = cv2.cvtColor(frame_copy, cv2.COLOR_RGBA2RGB)
         
         n_frame_copy = cv2.cvtColor(n_frame, cv2.COLOR_RGBA2RGB)
-        # cv2.imwrite(f'{frame_number}.jpg',frame_copy)
+        # cv2.imwrite(f'{frame_path}/{frame_number}.jpg',frame_copy)
         
         camera_id = frame_meta.pad_index
-        source_Id = frame_meta.source_id
         
         dev_info = dev_list[camera_id]
         subscriptions = dev_info['subscriptions']
@@ -259,10 +297,10 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                 gif_dict[device_id] = []
             if device_id not in gif_created:
                 gif_created[device_id] = False
-        
-        # if 'Bagdogra' not in subscriptions:
-        #     threading.Thread(target = gif_build,args = (n_frame_copy, dev_id_dict[camera_id], gif_dict, gif_created,)).start()
-        
+                
+        if 'Bagdogra' not in subscriptions:
+            threading.Thread(target = gif_build,args = (n_frame_copy, dev_id_dict[camera_id], gif_dict, gif_created,)).start()
+                
         num_detect = frame_meta.num_obj_meta
         # print(datetime.datetime.now(timezone))
         device_timestamp = datetime.datetime.now(timezone)
@@ -272,68 +310,113 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
         'camera_id' : camera_id,
         'frame_timestamp' : device_timestamp,
         'objects': []  # List to hold object dictionaries
-    }   
+    }
+        # print(frame_dict)
         l_obj=frame_meta.obj_meta_list
-        # print(frame_meta)
         # print(dev_id_dict[camera_id])
         n_frame_bbox = None
+        output_lbl = None
         while l_obj is not None:
             try:
                 # Casting l_obj.data to pyds.NvDsObjectMeta
                 obj_meta=pyds.NvDsObjectMeta.cast(l_obj.data) #new obj
                 obj_counter[obj_meta.class_id] += 1
-
                 confidence_score = obj_meta.confidence
-                
                 detect_type = obj_meta.obj_label
-                
-                bbox = obj_meta.tracker_bbox_info 
-                
                 rect_params = obj_meta.rect_params
+                text_params = obj_meta.text_params
                 left = rect_params.left
                 top = rect_params.top
                 width = rect_params.width
                 height = rect_params.height
                 
-                n_frame_bbox = None
-                n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence)
-                # cv2.imwrite(f"/home/agx123/DS_pipeline_new/frame_bbox/{frame_number}.jpg",n_frame_bbox)
-                # # convert python array into numpy array format in the copy mode.
-                # frame_bbox = np.array(n_frame_bbox, copy=True, order='C')
-                # # convert the array into cv2 default color format
-                # frame_bbox = cv2.cvtColor(frame_bbox, cv2.COLOR_RGBA2BGRA)
+                if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
+                    bbox_color = "green"
+                    rect_params.has_bg_color = 1
+                    rect_params.border_color.red = 0.0
+                    rect_params.border_color.green = 1.0
+                    rect_params.border_color.blue = 0.0
+                    rect_params.border_color.alpha = 1.0
+                    rect_params.bg_color.red = 0.0
+                    rect_params.bg_color.green = 1.0
+                    rect_params.bg_color.blue = 0.0
+                    rect_params.bg_color.alpha = 0.3
+                    
+                    
+                if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_1):
+                    bbox_color = "blue"
+                    rect_params.has_bg_color = 1
+                    rect_params.border_color.red = 0.0
+                    rect_params.border_color.green = 0.0
+                    rect_params.border_color.blue = 1.0
+                    rect_params.border_color.alpha = 1.0
+                    rect_params.bg_color.red = 0.0
+                    rect_params.bg_color.green = 0.0
+                    rect_params.bg_color.blue = 1.0
+                    rect_params.bg_color.alpha = 0.3
+                    
+                if detect_type is not None:
+                    text_params.display_text = detect_type
+                    
+                    if detect_type in anomaly_objs:
+                        bbox_color = "red"
+                        rect_params.has_bg_color = 1
+                        rect_params.border_color.red = 1.0
+                        rect_params.border_color.green = 0.0
+                        rect_params.border_color.blue = 0.0
+                        rect_params.border_color.alpha = 1.0
+                        rect_params.bg_color.red = 1.0
+                        rect_params.bg_color.green = 0.0
+                        rect_params.bg_color.blue = 0.0
+                        rect_params.bg_color.alpha = 0.3
                 
-                n_frame_crop = crop_object(n_frame, obj_meta)
-                # # convert python array into numpy array format in the copy mode.
-                # frame_crop_copy = np.array(n_frame_crop, copy=True, order='C')
-                # # convert the array into cv2 default color format
-                frame_crop_copy = cv2.cvtColor(n_frame_crop, cv2.COLOR_RGBA2BGRA)
-                # cv2.imwrite(f"/home/agx123/DS_pipeline_new/frame_crops/{frame_number}.jpg",frame_crop_copy)
-                
-                obj_id  =  int(obj_meta.object_id)
                 parent  = obj_meta.parent
 
                 if parent is not None:
-                    # age_dict[obj_id] = age_dict[parent.object_id]
-                    # print('parent id is present')
                     obj_id = parent.object_id
-                    
-                    # print(obj_id)
-                    
                 else :
-                    parent_id = "NA"
+                    obj_id  =  int(obj_meta.object_id)
+                
+                if(obj_meta.unique_component_id == PRIMARY_DETECTOR_UID_1):
+                    if 'Activity' in subscriptions:
+                        output_lbl = fetch_activity_info(detect_type)
+                    else:
+                        output_lbl = fetch_member_info(detect_type)
+                        
+                    if output_lbl is not None:
+                        if len(output_lbl)!=0:
+                            obj_id_str = str(obj_id)
+                            if obj_id_str in output_lbl:
+                                text_params.display_text = output_lbl[obj_id_str]
+                                
+                n_frame_bbox = None
+                
+                if output_lbl is not None and len(output_lbl)!=0:
+                    obj_id_str = str(obj_id)
+                    if obj_id_str in output_lbl:
+                        n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence, output_lbl[obj_id_str], bbox_color)
+                    else:
+                        n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence, detect_type, bbox_color)
+                else:
+                    n_frame_bbox = draw_bounding_boxes(frame_copy, obj_meta, obj_meta.confidence, detect_type, bbox_color)
+                    
+                        
+                cv2.imwrite(f'{infer_path}/{frame_number}.jpg',n_frame_bbox)
+                
+                n_frame_crop = crop_object(n_frame, obj_meta)
+                frame_crop_copy = cv2.cvtColor(n_frame_crop, cv2.COLOR_RGBA2BGRA)
+                frame_crop = cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB)
+                # if(obj_meta.unique_component_id == SECONDARY_DETECTOR_UID_2):
+                    # cv2.imwrite(f'{crop_path}/{frame_number}.jpg',frame_crop)
 
 
                 if obj_id not in age_dict:
                     age_dict[obj_id] = 0
                     age_dict[obj_id] = age_dict[obj_id] + 1
-                else:
+                else:   
                     age_dict[obj_id] = age_dict[obj_id] + 1
 
-                
 
-                # print(age_dict)
-                # print(detect_type)
                 if detect_type in subscriptions_class_list:
                     obj_dict =  {
                     'detect_type' : detect_type,
@@ -346,68 +429,20 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     'timestamp' :  dt.strftime("%H:%M:%S %d/%m/%Y"),
                     'crop' : cv2.cvtColor(frame_crop_copy, cv2.COLOR_BGR2RGB),
                     'age' : age_dict[obj_id]
-                    # 'dirs' : x,
-                    # 'tracker' : y
                     }
-                    # print(obj_dict)
                     if detect_type in constantIdObjects:
                         obj_dict['obj_id'] = 1
                     frame_dict['objects'].append(obj_dict)
-
-                
+                    
             except StopIteration:
                 break
+            
             obj_counter[obj_meta.class_id] += 1
             
             try: 
                 l_obj=l_obj.next
             except StopIteration:
                 break
-
-        # # Acquiring a display meta object. The memory ownership remains in
-        # # the C code so downstream plugins can still access it. Otherwise
-        # # the garbage collector will claim it when this probe function exits.
-        display_meta=pyds.nvds_acquire_display_meta_from_pool(batch_meta)
-        display_meta.num_labels = 1
-        py_nvosd_text_params = display_meta.text_params[0]
-        # Setting display text to be shown on screen
-        # Note that the pyds module allocates a buffer for the string, and the
-        # memory will not be claimed by the garbage collector.
-        # Reading the display_text field here will return the C address of the
-        # allocated string. Use pyds.get_string() to get the string content.
-
-        display_text_deepstream = "Frame Number={} Number of ".format(frame_number)
-        # print(obj_counter)
-        obj_cnt = [obj_counter[idd] for idd in obj_counter]
-        # print(obj_cnt)
-        # print(label_dict)
-        for label in label_dict:
-            # print(label)
-            display_text_deepstream = display_text_deepstream +label+" = {} "
-        # print(display_text_deepstream.format(*obj_cnt))
-
-
-        # Male={} Female={} Knife ={} Gun={} , obj_counter[PGIE_CLASS_ID_MALE], obj_counter[PGIE_CLASS_ID_FEMALE], obj_counter[PGIE_CLASS_ID_KNIFE], obj_counter[PGIE_CLASS_ID_GUN]
-        py_nvosd_text_params.display_text = display_text_deepstream
-
-
-        # Now set the offsets where the string should appear
-        py_nvosd_text_params.x_offset = 10
-        py_nvosd_text_params.y_offset = 12
-
-        # Font , font-color and font-size
-        py_nvosd_text_params.font_params.font_name = "Serif"
-        py_nvosd_text_params.font_params.font_size = 10
-        # set(red, green, blue, alpha); set to White
-        py_nvosd_text_params.font_params.font_color.set(1.0, 1.0, 1.0, 1.0)
-
-        # Text background color
-        py_nvosd_text_params.set_bg_clr = 1
-        # set(red, green, blue, alpha); set to Black
-        py_nvosd_text_params.text_bg_clr.set(0.0, 0.0, 0.0, 1.0)
-        # Using pyds.get_string() to get display_text as string
-        # print(pyds.get_string(py_nvosd_text_params.display_text))
-        pyds.nvds_add_display_meta_to_frame(frame_meta, display_meta)
         try:
             l_frame=l_frame.next
             # detect_data.append(frame_dict)   #optional line detect_data is not used any where just holding all frame_dicts
@@ -418,28 +453,20 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                 frame_dict['np_arr'] = n_frame_bbox   
                 frame_dict['org_frame'] = n_frame
             else:
-                
-
                 frame_dict['np_arr'] = frame_copy
                 frame_dict['org_frame'] = n_frame
             cnt = cnt + 1
-            # print("cnt: ",cnt)
-            # if cnt >= 25:
-            #     cv2.imwrite("test1.jpg",frame_dict['np_arr'])
-            #     cnt = 0
-                
+
             # print("starting to put elements in queue")
+            # print(frame_dict)
+            # print(detect_type)
             framedata_queue.put([frame_dict,dev_id_dict])
-            # frame_2_dict(framedata_queue)
-            # threading.Thread(target = frame_2_dict,args = (frame_dict,dev_id_dict,)).start()
-            # frame_dict.clear()
+            
             if is_aarch64():
                 pyds.unmap_nvds_buf_surface(hash(gst_buffer), frame_meta.batch_id)
         except StopIteration:
             break
-    return Gst.PadProbeReturn.OK	
-
-######################################################################
+    return Gst.PadProbeReturn.OK
 
 
 def cb_newpad(decodebin, decoder_src_pad,data):
@@ -530,6 +557,7 @@ def create_source_bin(index,uri):
  ######################################################################
 
 def main(args):
+    
     print(args)
     global dev_id_dict
     # Check input arguments
@@ -545,6 +573,7 @@ def main(args):
     # Create Pipeline element that will form a connection of other elements
     print("Creating Pipeline \n ")
     pipeline = Gst.Pipeline()
+
     if not pipeline:
         sys.stderr.write(" Unable to create Pipeline \n")
     print("Creating streamux \n ")
@@ -615,11 +644,6 @@ def main(args):
     encoder = Gst.ElementFactory.make("nvv4l2h264enc", "encoder") 
     if not encoder:
         sys.stderr.write(" Unable to create encoder \n")
-    
-    print("Creating mpeg-ts muxer \n ")
-    container = Gst.ElementFactory.make("mpegtsmux", "mux")
-    if not container:
-        sys.stderr.write(" Unable to create container \n")
 
     print("Creating parser \n ")
     parser = Gst.ElementFactory.make("h264parse", "parser") 
@@ -646,38 +670,39 @@ def main(args):
 
     caps0 = Gst.Caps.from_string("video/x-raw(memory:NVMM), format=RGBA")
     capsfilter0.set_property("caps", caps0)
-
-
     
     print("Creating capsfilter \n")
 
     capsfilter = Gst.ElementFactory.make("capsfilter", "capsfilter")
     if not capsfilter:
         sys.stderr.write(" Unable to create capsfilter0 \n")
-    caps = Gst.Caps.from_string("video/x-raw(memory:NVMM), width=1280, height=720")
+    caps = Gst.Caps.from_string("video/x-raw(memory:NVMM), format=RGBA, width=640, height=640")
     capsfilter.set_property("caps", caps)
-
-    capsfilter_osd = Gst.ElementFactory.make("capsfilter", "caps_osd")
-    caps_osd = Gst.Caps.from_string("video/x-raw(memory:NVMM), width=1280, height=720")
-    capsfilter_osd.set_property("caps", caps_osd)
 
     queue = Gst.ElementFactory.make("queue", "queue_0")
     queue1 = Gst.ElementFactory.make("queue", "queue_1")
     queue2 = Gst.ElementFactory.make("queue", "queue_2")
     queue3 = Gst.ElementFactory.make("queue", "queue_3")
+    queue4 = Gst.ElementFactory.make("queue", "queue_4")
+    
+    queue.set_property("leaky", 2)
+    queue1.set_property("leaky", 2)
+    queue2.set_property("leaky", 2)
+    queue3.set_property("leaky", 2)
+    queue4.set_property("leaky", 2)
+    queue.set_property("max-size-buffers", 100)
+    queue.set_property("max-size-bytes", 1242880)
+    queue.set_property("max-size-time", 100000000)
     # streammux.set_property('config-file-path', 'mux_config.txt')
     # streammux.set_property('batch-size', number_sources)
-    # streammux.set_property("sync-inputs",1)
-    # streammux.set_property("max-latency",200)
     streammux.set_property("max-latency", 40000000)
     streammux.set_property('sync-inputs', 1)
     streammux.set_property('width', 1280)
     streammux.set_property('height', 720)
     streammux.set_property('batch-size', number_sources)
+    # streammux.set_property('buffer-pool-size',10)
     streammux.set_property('batched-push-timeout', 40000)
-    # streammux.set_property('num-surfaces-per-frame', 1)
-    # streammux.set_property('compute-hw', 1)
-
+    streammux.set_property('live-source', 1)
 
     config = configparser.ConfigParser()
     config.read('./data/dstest2_tracker_config.txt')
@@ -699,72 +724,64 @@ def main(args):
         if key == 'll-config-file' :
             tracker_ll_config_file = config.get('tracker', key)
             tracker.set_property('ll-config-file', tracker_ll_config_file)
-        if key == 'enable-batch-process' :
-            tracker_enable_batch_process = config.getint('tracker', key)
-            tracker.set_property('enable_batch_process', tracker_enable_batch_process)
-        if key == 'enable-past-frame' :
-            tracker_enable_past_frame = config.getint('tracker', key)
-            tracker.set_property('enable_past_frame', tracker_enable_past_frame)
+        if not is_aarch64():
+            if key == 'enable-batch-process' :
+                tracker_enable_batch_process = config.getint('tracker', key)
+                tracker.set_property('enable_batch_process', tracker_enable_batch_process)
+            if key == 'enable-past-frame' :
+                tracker_enable_past_frame = config.getint('tracker', key)
+                tracker.set_property('enable_past_frame', tracker_enable_past_frame)
 
 #############################################################################################################
     pgie1.set_property('config-file-path', pgie1_path)
-    # pgie1.set_property('classifier_async_mode',1)
     pgie1_batch_size=pgie1.get_property("batch-size")
-    if(pgie1_batch_size != number_sources):
-        print("WARNING: Overriding infer-config batch-size",pgie1_batch_size," with number of sources ", number_sources," \n")
-    pgie1.set_property("batch-size", number_sources)
+    print("PGIE1 BATCH SIZE: ", pgie1_batch_size)
+    # if(pgie1_batch_size != number_sources):
+    #     print("WARNING: Overriding infer-config batch-size",pgie1_batch_size," with number of sources ", number_sources," \n")
+    # pgie1.set_property("batch-size", number_sources)
 
 #############################################################################################################
     sgie1.set_property('config-file-path', sgie1_path)
-    # sgie1.set_property('classifier_async_mode',1)
-
     sgie1_batch_size=sgie1.get_property("batch-size")
-    if(sgie1_batch_size != number_sources):
-        print("WARNING: Overriding infer-config batch-size",sgie1_batch_size," with number of sources ", number_sources," \n")
-    sgie1.set_property("batch-size", number_sources)
+    print("SGIE1 BATCH SIZE: ", sgie1_batch_size)
+    # if(sgie1_batch_size != number_sources):
+    #     print("WARNING: Overriding infer-config batch-size",sgie1_batch_size," with number of sources ", number_sources," \n")
+    # sgie1.set_property("batch-size", number_sources)
 
 #############################################################################################################    
     sgie2.set_property('config-file-path', sgie2_path)
-    # sgie2.set_property('classifier_async_mode',1)
-
     sgie2_batch_size=sgie2.get_property("batch-size")
-    
-    if(sgie2_batch_size != number_sources):
-        print("WARNING: Overriding infer-config batch-size",sgie2_batch_size," with number of sources ", number_sources," \n")
-    sgie2.set_property("batch-size", number_sources)
+    print("SGIE2 BATCH SIZE: ", sgie2_batch_size)
+    # if(sgie2_batch_size != number_sources):
+    #     print("WARNING: Overriding infer-config batch-size",sgie2_batch_size," with number of sources ", number_sources," \n")
+    # sgie2.set_property("batch-size", number_sources)
 
 #############################################################################################################    
     pgie2.set_property('config-file-path', pgie2_path)
-    # pgie2.set_property('classifier_async_mode',1)
-
     pgie2_batch_size=pgie2.get_property("batch-size")
-    if(pgie2_batch_size != number_sources):
-        print("WARNING: Overriding infer-config batch-size",pgie2_batch_size," with number of sources ", number_sources," \n")
-    pgie2.set_property("batch-size", number_sources)
-    
-
-    
+    print("PGIE2 BATCH SIZE: ", pgie2_batch_size)
+    # if(pgie2_batch_size != number_sources):
+    #     print("WARNING: Overriding infer-config batch-size",pgie2_batch_size," with number of sources ", number_sources," \n")
+    # pgie2.set_property("batch-size", number_sources)
 
     if not is_aarch64():
         mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
-        # streammux.set_property("nvbuf-memory-type", 0)
         streammux.set_property("nvbuf-memory-type", mem_type)
         nvvidconv.set_property("nvbuf-memory-type", mem_type)
-     
         
-     
-    
     #adding elements to the pipeline
     print("Adding elements to Pipeline \n")
     pipeline.add(pgie1)
-    pipeline.add(sgie1)
     pipeline.add(pgie2)
+    pipeline.add(sgie1)
     pipeline.add(sgie2)
     pipeline.add(queue)
     pipeline.add(queue1)
     pipeline.add(queue2)
     pipeline.add(queue3)
+    pipeline.add(queue4)
     pipeline.add(nvvidconv)
+    pipeline.add(capsfilter)
     pipeline.add(capsfilter0)
     pipeline.add(demux)
     
@@ -772,16 +789,17 @@ def main(args):
     print("Linking elements in the Pipeline \n")
     streammux.link(queue)
     queue.link(nvvidconv)
-    nvvidconv.link(capsfilter0)
-    capsfilter0.link(pgie2)
-    pgie2.link(queue1)
+    nvvidconv.link(capsfilter)
+    capsfilter.link(queue1)
     queue1.link(pgie1)
     pgie1.link(tracker)
     tracker.link(queue2)
     queue2.link(sgie1)
     sgie1.link(queue3)
     queue3.link(sgie2)
-    sgie2.link(demux)
+    sgie2.link(queue4)
+    queue4.link(pgie2)
+    pgie2.link(demux)
     
 
     for i in range(number_sources):
@@ -798,8 +816,8 @@ def main(args):
         sink = Gst.ElementFactory.make("hlssink", f"sink_{i}")
         pipeline.add(sink)
         devid = dev_id_dict[i]['deviceId']
-        # sink.set_property('playlist-root', f'https://{DDNS}/live/{devid}') # Location of the playlist to write
-        sink.set_property('playlist-root', f'http://localhost:9001/{devid}') # Location of the playlist to write
+        sink.set_property('playlist-root', f'https://{DDNS}/live/{devid}') # Location of the playlist to write
+        # sink.set_property('playlist-root', f'http://localhost:9001/{devid}') # Location of the playlist to write
         
         sink.set_property('playlist-location', f'{video_info}/{devid}.m3u8') # Location where .m3u8 playlist file will be stored
         sink.set_property('location',  f'{video_info}/segment.%01d.ts')  # Location whee .ts segmentrs will be stored
@@ -895,17 +913,11 @@ def main(args):
     bus.connect ("message", bus_call, loop)
 
     
-    tracker_src_pad=sgie2.get_static_pad("src")
+    tracker_src_pad=pgie2.get_static_pad("src")
     if not tracker_src_pad:
         sys.stderr.write(" Unable to get src pad \n")
     else:
         tracker_src_pad.add_probe(Gst.PadProbeType.BUFFER, tracker_src_pad_buffer_probe, args)
-
-    # List the sources
-    print("Now playing...")
-    for i, source in enumerate(args):
-        print(i, ": ", source)
-
 
     print("Starting pipeline \n")
     # start play back and listed to events		

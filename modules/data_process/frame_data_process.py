@@ -290,7 +290,7 @@ async def json_publish_activity(primary):
     print("Activity is getting published")
     # await asyncio.tim
 
-async def process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
+def process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
     print("process results")
     subscriptions = device_data[device_id]["subscriptions"]
     # print(output_json)
@@ -385,8 +385,8 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
                 status = dbpush_activities(output_json)
                 if(status == "SUCCESS!!"):
                     # add if sub has data process
-                    publish_status = asyncio.run(json_publish_activity(primary=output_json))
-                    await publish_status
+                    asyncio.run(json_publish_activity(primary=output_json))
+                    # await publish_status
                     print("DB insertion successful :)")
                     if 'Facial-Recognition' in subscriptions:
                         face_recognition_process(output_json_fr,device_id, act_batch_res)
@@ -404,7 +404,7 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
             # add if sub has data process 
             for detection in output_json['metaData']['object']:
                 del detection['cropsNumpyList']
-            # print("THE OUTPUT JSON STRUCTURE: ",output_json)
+            print("THE OUTPUT JSON STRUCTURE: ",output_json)
             
             if 'Bagdogra' not in subscriptions:
                 status = dbpush_activities(output_json)
@@ -419,10 +419,10 @@ async def process_results(device_id,batch_data,device_data,device_timestamp, org
                 elif(status == "FAILURE!!"):
                     print("DB insertion got failed :(")   
 
-    await asyncio.sleep(0)
+    # await asyncio.sleep(0)
 
 
-async def process_publish(device_id,batch_data,device_data,device_timestamp):
+def process_publish(device_id,batch_data,device_data,device_timestamp):
     # print("threading.activeCount",threading.activeCount())
 
     # with semaphore:
@@ -447,13 +447,13 @@ async def process_publish(device_id,batch_data,device_data,device_timestamp):
     # print(output_json)
     # print(output_json)
     # process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame)
-    # threading.Thread(target = process_results, args = (device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame,)).start()
+    threading.Thread(target = process_results, args = (device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame,)).start()
     # p = Process(target = process_results, args = (device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame,))
     # p.start()
     # p.join()
     # process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame)
-    inference_task = asyncio.create_task(process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame))
-    await inference_task
+    # inference_task = asyncio.create_task(process_results(device_id,batch_data,device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame))
+    # await inference_task
 # async def intermediate(device_id,batch_data,dev_id_dict, frame_timestamp):
 #     print("got imgs")
 #     process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
@@ -544,8 +544,8 @@ def frame_2_dict():
                     batch_data = isolate_queue[each]
                     isolate_queue[each] = []
                     # intermediate(device_id,batch_data,dev_id_dict, frame_timestamp)
-                    asyncio.run(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp))
-                    # process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
+                    # asyncio.run(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp))
+                    process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
                     # asyncio.create_task(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp))
         except Exception as e:
             print(e)
