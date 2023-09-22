@@ -56,8 +56,8 @@ def create_device_dict():
         device_dict["port"] = chunk[5]
         device_dict["videoEncodingInformation"] = 'H265'
         device_dict["username"] = chunk[7]
-        device_dict["rtsp"] = chunk[8]
-        # device_dict["rtsp"] = rtsp_links[i]
+        # device_dict["rtsp"] = chunk[8]
+        device_dict["rtsp"] = rtsp_links[i]
         # device_dict["rtsp"] = "file:///home/srihari/facerecog.mp4"
         # device_dict["rtsp"] = "rtsp://test:test123456789@streams.ckdr.co.in:2554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
         device_dict["password"] = chunk[9]
@@ -66,8 +66,8 @@ def create_device_dict():
         device_dict["lat"] = chunk[11]
         device_dict["long"] = chunk[12]
         dev_details.append(device_dict)
-        # if (i==3):
-        #     break
+        if (i==1):
+            break
 
     for devs in dev_details:
         # print(devs["subscriptions"])
