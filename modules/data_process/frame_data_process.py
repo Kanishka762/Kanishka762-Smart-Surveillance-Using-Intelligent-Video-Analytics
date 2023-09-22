@@ -17,7 +17,7 @@ import asyncio
 import lmdb
 import threading
 from torch.multiprocessing import Process, set_start_method
-from modules.deepstream.rtsp2frames import framedata_queue
+from modules.deepstream.rtsp2rtsp import framedata_queue
 from collections import deque
 
 from modules.alarm.alarm_light_trigger import alarm

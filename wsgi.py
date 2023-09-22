@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from init import *
 from modules.components.load_paths import *
-from modules.deepstream.rtsp2frames import main
+from modules.deepstream.rtsp2rtsp import main
 from modules.components.structure_dev_dict import create_device_dict
 from modules.db.db_push import gif_push
 from modules.data_process.frame_data_process import frame_2_dict
@@ -18,6 +18,7 @@ from modules.data_process.frame_data_process import frame_2_dict
 load_dotenv(dotenv_path)
 
 mem_data_queue = queue.Queue()
+<<<<<<< HEAD
 
 logger = loadLogger()
 
@@ -65,4 +66,26 @@ if __name__ == '__main__':
         logger.error("An error occurred outside function main", exc_info=e)
 
 
+=======
+rtsp_port = os.getenv("rtsp_port")
+if rtsp_port is not None and rtsp_port.isdigit():
+    rtsp_port_int = int(rtsp_port)
+
+if __name__ == '__main__':
+    
+    server = GstRtspServer.RTSPServer.new()
+    server.props.service = "%d" % rtsp_port_int
+    server.attach(None)
+    
+    threading.Thread(target = gif_push).start()
+    threading.Thread(target = frame_2_dict).start()
+    # threading.Thread(target = merge_global).start()
+
+
+    # p.daemon=True
+    # p.start()
+    dev_details = create_device_dict()
+    print(dev_details)
+    main(server, dev_details)
+>>>>>>> 71d342d90461d06347f4d4c0e2af6fe2957d8ab0
 
