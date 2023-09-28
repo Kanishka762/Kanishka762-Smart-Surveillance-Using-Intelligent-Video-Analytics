@@ -27,9 +27,11 @@ from mmaction.structures import ActionDataSample
 from mmaction.utils import frame_extract
 
 try:
+    import os
+    os.environ["IMAGEIO_FFMPEG_EXE"] = "/usr/bin/ffmpeg"
     import moviepy.editor as mpy
-except ImportError:
-    raise ImportError('Please install moviepy to enable output file')
+except ImportError as e:
+    raise ImportError('Please install moviepy to enable output file') from e
 
 cur_dir=os.getcwd()
 sys.path.append(cur_dir)
@@ -47,8 +49,8 @@ args_det_score_thr = 0.9
 args_det_cat_id = 0
 args_device =  "cuda:0"
 args_checkpoint = cur_dir + "/models_deepstream/best_mAP_overall_epoch_12.pth"
-args_action_score_thr = 0.5 
-args_output_stepsize = 4 
+args_action_score_thr = 0.5
+args_output_stepsize = 4
 tmp_dir = tempfile.TemporaryDirectory()
 config = mmengine.Config.fromfile(args_config)
 config.model.backbone.pretrained = None
