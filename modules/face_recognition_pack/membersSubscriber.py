@@ -1,4 +1,4 @@
-#multi treading 
+from init import loadLogger
 import asyncio
 import lmdb
 import cv2
@@ -15,81 +15,56 @@ import nats
 
 from nats.aio.client import Client as NATS
 
-# from modules.face_recognition_pack.facedatainsert_lmdb import add_member_to_lmdb
-# from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_list
-# from modules.face_recognition_pack.lmdb_components import load_lmdb_fst
-# from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
-
-
-
-# from modules.face_recognition_pack.recog_objcrop_face import cb
+logger = loadLogger()
 
 nc = NATS()
 
 async def cb(msg):
     try :
         global mem_data_queue
-        # print("+++++++++++++++++")
-        # # load_lmdb_list()
-        # print("+++++++++++++++++")
-
         data = (msg.data)
-        #print(data)
         data  = data.decode()
         data = json.loads(data)
-        print(data)
+        logger.info("received member data")
+        logger.info(data)
         mem_data_queue.put([data])
-        # print(status)
-        # if status:
-        # load_lmdb_list()
         subject = msg.subject
         reply = msg.reply
         data = msg.data.decode()
         await nc.publish(msg.reply,b'ok')
-        print("Received a message on '{subject} {reply}': {data}".format(
+        data("Received a message on '{subject} {reply}': {data}".format(
             subject=subject, reply=reply, data=data))
         
     except TypeError as e:
-        print(TypeError," nats add member error >> ", e)
+        # print(TypeError," nats add member error >> ", e)
+        logger.error("nats add member error >> ", exc_info=e)
+
         
     finally:
-        print("done with work ")
+        logger.info("done with work ")
         # sem.release()
 
 async def face_update_main():
-    #await member_video_ipfs(member_did, member_name, member_cid)
-    # nc = await nats.connect(servers=nats_urls , reconnect_time_wait= 50 ,allow_reconnect=True, connect_timeout=20, max_reconnect_attempts=60)
-    await nc.connect(servers=["nats://216.48.181.154:5222"] , reconnect_time_wait= 50 ,allow_reconnect=True, connect_timeout=20, max_reconnect_attempts=60)
-    # sub = await nc.subscribe("member.update.*", cb=cb)
-    sub = await nc.subscribe("member.update.faceid", cb=cb)
-
+    try:
+        logger.info("establishing connection with nats")
+        await nc.connect(servers=["nats://216.48.181.154:5222"] , reconnect_time_wait= 50 ,allow_reconnect=True, connect_timeout=20, max_reconnect_attempts=60)
+        sub = await nc.subscribe("member.update.faceid", cb=cb)
+    except Exception as e:
+        logger.error("An error occurred while connecting to nats", exc_info=e)
+        
 def startMemberService(q):
-    global mem_data_queue
-    mem_data_queue = q
-    print("starting member service")
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(face_update_main())
-    # loop.run_forever()
+    try:
+        global mem_data_queue
+        mem_data_queue = q
+        logger.info("starting member service")
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(face_update_main())
-    loop.run_forever()
-
-    # loop.close()
-
-# if __name__ == "__main__":
-#     startMemberService()
-
-    # while True:
-
-    #     asyncio.run(face_update_main())
-
-
-    
-    # except RuntimeError as e:
-    #     print("error ", e)
-    #     print(torch.cuda.memory_summary(device=None, abbreviated=False), "cuda")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(face_update_main())
+        loop.run_forever()
+    except Exception as e:
+        logger.error("An error occurred while starting member service", exc_info=e)
+        
 
   #  b'{"memberId":"did:ckdr:Ee1roJXJH4z2WkORnANm5gBpYUoIz7+6q9/1Gkr6y0KnFA==","faceid":["Qmf8ahSfoVeAVjkzamdsCZgnkw6FuuphSoAciGgH7zSvUP"],"type":"ADD_FACE","createdAt":"2023-02-02T16:42:49.233+05:30"}'
 #{'id': 'tuxSv3G6ljsjjM2gTr-qN0sOL7HkB37j', 'type': 'FACEID', 'member': [{'memberId': 'did:ckdr:Ee1roJXJH4z2WkORnANm5gBpYUoIz7+6q9/1Gkr6y0KnFA==', 'faceCID': ['Qmf8ahSfoVeAVjkzamdsCZgnkw6FuuphSoAciGgH7zSvUP'], 'role': 'admin'}]}
