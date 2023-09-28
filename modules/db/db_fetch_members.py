@@ -53,7 +53,7 @@ def fetch_db_mem():
         connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
         cursor=connection.cursor()
         cursor.execute(f"""SELECT id, type, "tenantId", track, "firstName", "userId", "blackListed", faceid
-        FROM "Member" WHERE id IS NOT NULL AND type IS NOT NULL AND "tenantId" in ({value_str}) AND track IS NOT NULL AND faceid IS NOT NULL;""")
+        FROM "Member" WHERE id IS NOT NULL AND type IS NOT NULL AND "tenantId" in ({value_str}) AND track IS NOT NULL AND faceid IS NOT NULL AND deleted = False;""")
         members = []
         for row in cursor.fetchall():
             member_info = {'id': row[0], 'updated': False, "member": []}

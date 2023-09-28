@@ -54,13 +54,13 @@ track_type = ast.literal_eval(os.getenv("track_type"))
 frame_bbox_color = ast.literal_eval(os.getenv("color"))
 
 timezone = pytz.timezone(f'{place}')  #assign timezone
-pgie1_path = cwd + f"/models_deepstream/{tenant_name}/{device}/gender/config.txt"
-pgie2_path = cwd + f"/models_deepstream/{tenant_name}/{device}/fire/config.txt"
-sgie1_path = cwd + f"/models_deepstream/{tenant_name}/{device}/face_detect/config.txt"
-sgie2_path = cwd + f"/models_deepstream/{tenant_name}/{device}/dangerous_object/config.txt"
-frame_path = cwd + "/static/frames/"
-infer_path = cwd + "/static/image/"
-crop_path = cwd + "/static/crops/"
+pgie1_path = f"{cwd}/models_deepstream/{tenant_name}/{device}/gender/config.txt"
+pgie2_path = f"{cwd}/models_deepstream/{tenant_name}/{device}/fire/config.txt"
+sgie1_path = f"{cwd}/models_deepstream/{tenant_name}/{device}/face_detect/config.txt"
+sgie2_path = f"{cwd}/models_deepstream/{tenant_name}/{device}/dangerous_object/config.txt"
+frame_path = f"{cwd}/static/frames/"
+infer_path = f"{cwd}/static/image/"
+crop_path = f"{cwd}/static/crops/"
 
 age_dict = {}
 dev_id_dict = {}
@@ -68,10 +68,7 @@ gif_dict = {}
 detect_data = []
 gif_created = {}
 cnt = 0
-label_dict = {}
-for i,label in enumerate(obj_det_labels):
-    label_dict[label] = i 
-
+label_dict = {label: i for i, label in enumerate(obj_det_labels)}
 PRIMARY_DETECTOR_UID_1 = 1
 PRIMARY_DETECTOR_UID_2 = 2
 SECONDARY_DETECTOR_UID_1 = 3
@@ -83,8 +80,7 @@ OSD_DISPLAY_TEXT= 1
 pgie_classes_str= [ "Male","Female","Fire","Smoke","Gun","Knife"]
 BITRATE  = 4000000
 
-db_env = lmdb.open(lmdb_path+'/face-detection',
-                max_dbs=10)
+db_env = lmdb.open(f'{lmdb_path}/face-detection', max_dbs=10)
 IdLabelInfoDB = db_env.open_db(b'IdLabelInfoDB', create=True)
 trackIdMemIdDictDB = db_env.open_db(b'trackIdMemIdDictDB', create=True)
 
@@ -127,92 +123,79 @@ def draw_bounding_boxes(image, obj_meta, confidence, label_str, bbox_color):
                         color, 2)
     return image
 
+
 def crop_object(image, obj_meta):
     rect_params = obj_meta.rect_params
-    top = int(rect_params.top)
-    left = int(rect_params.left)
-    width = int(rect_params.width)
-    height = int(rect_params.height)
-    # obj_name = pgie_classes_str[obj_meta.class_id]
-    obj_name = obj_meta.obj_label
-    x1 = left
-    y1 = top
-    x2 = left + width
-    y2 = top + height
-    crop_img=save_one_box([x1,y1,x2,y2],image)
-    crop=cv2.cvtColor(crop_img,cv2.COLOR_BGR2RGB)
-    # crop_img = image[top:top+height, left:left+width]
-    return crop
+    x1, y1, x2, y2 = map(int, (rect_params.left, rect_params.top, rect_params.left + rect_params.width, rect_params.top + rect_params.height))
+    crop_img = save_one_box([x1, y1, x2, y2], image)
+    return cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB)
 
 def findClassList(subscriptions):
     subscriptions_class_list = [item for sublist in [classDict[each] for each in subscriptions if each in classDict] for item in sublist]
-    for each in obj_det_labels:
-        subscriptions_class_list.append(each)
+    subscriptions_class_list.extend(iter(obj_det_labels))
     return subscriptions_class_list
-    
+
+#TODO: check new logics are right
 def fetch_activity_info(detect_type):
     key = "IdLabelInfo"
     output_dict = {}
     with db_env.begin(db=IdLabelInfoDB, write=True) as db_txn:
         value = db_txn.get(key.encode())
-        if value is not None:
-            data = json.loads(value.decode())
-            for key, value in data.items():
-                memID = value['memberID']
-                activities = list(set(value['activity']))
-                
-                if memID is not None:
-                    if memID == '100':
-                        if memID in track_type:
-                            member_track_type = track_type[memID]
-                    else:
-                        mem_type = memID[:2]
-                        if mem_type in track_type:
-                            member_track_type = track_type[mem_type]
-                else:
-                    member_track_type = None
-                
-                if member_track_type is None:
-                    sentence = f"{detect_type} {' '.join(activities)}"
-                else:
-                    sentence = f"{member_track_type} {detect_type} {' '.join(activities)}"
-
-                output_dict[key] = sentence
-            
-            return output_dict
-        else:
+        if value is None:
             return None
-        
+        data = json.loads(value.decode())
+        for key, value in data.items():
+            memID = value['memberID']
+            activities = list(set(value['activity']))
+
+            if memID is None:
+                member_track_type = None
+
+            elif memID == '100':
+                if memID in track_type:
+                    member_track_type = track_type[memID]
+            else:
+                mem_type = memID[:2]
+                if mem_type in track_type:
+                    member_track_type = track_type[mem_type]
+            sentence = (
+                f"{detect_type} {' '.join(activities)}"
+                if member_track_type is None
+                else f"{member_track_type} {detect_type} {' '.join(activities)}"
+            )
+            output_dict[key] = sentence
+
+        return output_dict
+
+#TODO: check new logics are right
 def fetch_member_info(detect_type):
     key = "trackIdMemIdDict"
     output_dict = {}
     with db_env.begin(db=trackIdMemIdDictDB, write=True) as db_txn:
         value = db_txn.get(key.encode())
-        if value is not None:
-            data = json.loads(value.decode())
-            for key, value in data.items():
-                memID = (data[key])[-1]
-                
-                if memID is not None:
-                    if memID == '100':
-                        if memID in track_type:
-                            member_track_type = track_type[memID]
-                    else:
-                        mem_type = memID[:2]
-                        if mem_type in track_type:
-                            member_track_type = track_type[mem_type]
-                else:
-                    member_track_type = None
-                
-                if member_track_type is None:
-                    sentence = f"{detect_type}"
-                else:
-                    sentence = f"{member_track_type} {detect_type}"
+    if value is None:
+        return None
+    data = json.loads(value.decode())
+    for key, value in data.items():
+        memID = (data[key])[-1]
 
-                output_dict[key] = sentence
-            return output_dict
+        if memID is None:
+            member_track_type = None
+
+        elif memID == '100':
+            if memID in track_type:
+                member_track_type = track_type[memID]
         else:
-            return None
+            mem_type = memID[:2]
+            if mem_type in track_type:
+                member_track_type = track_type[mem_type]
+        sentence = (
+            f"{detect_type}"
+            if member_track_type is None
+            else f"{member_track_type} {detect_type}"
+        )
+        output_dict[key] = sentence
+    return output_dict
 
 def tracker_src_pad_buffer_probe(pad,info,dev_list):
     
@@ -359,11 +342,10 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
                     else:
                         output_lbl = fetch_member_info(detect_type)
                         
-                    if output_lbl is not None:
-                        if len(output_lbl)!=0:
-                            obj_id_str = str(obj_id)
-                            if obj_id_str in output_lbl:
-                                text_params.display_text = output_lbl[obj_id_str]
+                    if output_lbl is not None and len(output_lbl)!=0:
+                        obj_id_str = str(obj_id)
+                        if obj_id_str in output_lbl:
+                            text_params.display_text = output_lbl[obj_id_str]
                                 
                 n_frame_bbox = None
                 
@@ -447,9 +429,7 @@ def tracker_src_pad_buffer_probe(pad,info,dev_list):
 
 def cb_newpad(decodebin, decoder_src_pad,data):
     print("In cb_newpad\n")
-    caps=decoder_src_pad.get_current_caps()
-    if not caps:
-        caps = decoder_src_pad.query_caps()
+    caps = decoder_src_pad.get_current_caps() or decoder_src_pad.query_caps()
     gststruct=caps.get_structure(0)
     gstname=gststruct.get_name()
     source_bin=data
@@ -778,108 +758,181 @@ def main(args):
     pgie2.link(demux)
     
 
-    for i in range(number_sources):
-        print("Creating sink ",i," \n ")
+    # try:
+    #     for i in range(number_sources):
+    #         try:
+    #             logger.info("Creating sink %d\n",i)
+                
+    #             if args[i]['ddns'] is None or args[i]['ddns'] == "":
+    #                 DDNS = ddns_name
+    #             else:
+    #                 DDNS = args[i]['ddns']
+                    
+    #             video_info = hls_path + '/' + dev_id_dict[i]['deviceId']
+    #             if not os.path.exists(video_info):
+    #                 os.makedirs(video_info, exist_ok=True)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink parameters", exc_info=e)
+                
+    #         try:
+    #             logger.info("Creating hlssink %d\n",i)
+    #             sink = Gst.ElementFactory.make("hlssink", f"sink_{i}")
+    #             if not sink:
+    #                 sys.stderr.write(" Unable to create hlssink \n")
+    #             pipeline.add(sink)
+    #             devid = dev_id_dict[i]['deviceId']
+    #             sink.set_property('playlist-root', f'https://{DDNS}/live/{devid}') # Location of the playlist to write
+    #             # sink.set_property('playlist-root', f'http://localhost:9001/{devid}') # Location of the playlist to write
+                
+    #             sink.set_property('playlist-location', f'{video_info}/{devid}.m3u8') # Location where .m3u8 playlist file will be stored
+    #             sink.set_property('location',  f'{video_info}/segment.%01d.ts')  # Location whee .ts segmentrs will be stored
+    #             sink.set_property('target-duration', target_duration) # The target duration in seconds of a segment/file. (0 - disabled, useful
+    #             sink.set_property('playlist-length', playlist_length) # Length of HLS playlist. To allow players to conform to section 6.3.3 of the HLS specification, this should be at least 3. If set to 0, the playlist will be infinite.
+    #             sink.set_property('max-files', max_files) # Maximum number of files to keep on disk. Once the maximum is reached,old files start to be deleted to make room for new ones.
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating and setting properties of hlssink", exc_info=e)
+            
+    #         try:
+    #             # creating queue
+    #             queue_0 = Gst.ElementFactory.make("queue", f"queue_1_{i}")
+    #             pipeline.add(queue_0)
+    #             queue_1 = Gst.ElementFactory.make("queue", f"queue_2_{i}")
+    #             pipeline.add(queue_1)
+    #             queue_2 = Gst.ElementFactory.make("queue", f"queue_3_{i}")
+    #             pipeline.add(queue_2)
+    #             queue_3 = Gst.ElementFactory.make("queue", f"queue_4_{i}")
+    #             pipeline.add(queue_3)
+    #             queue_4 = Gst.ElementFactory.make("queue", f"queue_5_{i}")
+    #             pipeline.add(queue_4)
+    #             queue_5 = Gst.ElementFactory.make("queue", f"queue_6_{i}")
+    #             pipeline.add(queue_5)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink queues", exc_info=e)
+                
+    #         try:
+    #             logger.info("Creating Sink h264parse %d\n",i)
+    #             parser = Gst.ElementFactory.make("h264parse", f"parse_{i}")
+    #             if not parser:
+    #                 sys.stderr.write(" Unable to create h264parse \n")
+    #             pipeline.add(parser)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink h264parse", exc_info=e)
+                
+    #         try:
+    #             # creating nvvidconv
+    #             logger.info("Creating Sink nvvidconv %d\n",i)
+    #             nvvideoconvert = Gst.ElementFactory.make("nvvideoconvert", f"nvc_{i}")
+    #             if not nvvideoconvert:
+    #                 sys.stderr.write(" Unable to create nvvidconv \n")
+    #             pipeline.add(nvvideoconvert)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink nvvidconv", exc_info=e)
+                
+    #         try:
+    #             logger.info("Creating Sink OSD capsfilter %d\n",i)
+    #             capsfilter_osd = Gst.ElementFactory.make("capsfilter", f"caps_osd_{i}")
+    #             if not capsfilter_osd:
+    #                 sys.stderr.write(" Unable to create sink capsfilter_osd \n")
+    #             pipeline.add(capsfilter_osd)
+    #             caps_osd = Gst.Caps.from_string("video/x-raw(memory:NVMM), format=RGBA, width=1280, height=720")
+    #             capsfilter_osd.set_property("caps", caps_osd)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink capsfilter_osd", exc_info=e)
+            
+    #         try:
+    #             # creating nvosd
+    #             logger.info("Creating Sink OSD %d\n",i)
+    #             nvdsosd = Gst.ElementFactory.make("nvdsosd", f"osd_{i}")
+    #             if not nvdsosd:
+    #                 sys.stderr.write(" Unable to create nvdsosd \n")
+    #             pipeline.add(nvdsosd)
+    #             nvdsosd.set_property("process-mode", OSD_PROCESS_MODE)
+    #             nvdsosd.set_property("display-text", OSD_DISPLAY_TEXT)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink nvdsosd", exc_info=e)
+            
+    #         try:
+    #             logger.info("Creating Sink nvvidconv_postosd %d\n",i)
+    #             nvvidconv_postosd = Gst.ElementFactory.make("nvvideoconvert", f"nv_post_ods{i}")
+    #             if not nvvidconv_postosd:
+    #                 sys.stderr.write(" Unable to create nvvidconv_postosd \n")
+    #             pipeline.add(nvvidconv_postosd)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink nvvidconv_postosd", exc_info=e)
+            
+    #         try:
+    #             logger.info("Creating Sink capsfilter %d\n",i)
+    #             capsfilter = Gst.ElementFactory.make("capsfilter", f"caps_{i}")
+    #             if not capsfilter:
+    #                 sys.stderr.write(" Unable to create capsfilter \n")
+    #             pipeline.add(capsfilter)
+    #             caps = Gst.Caps.from_string("video/x-raw(memory:NVMM), width=1280, height=720")
+    #             capsfilter.set_property("caps", caps)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink capsfilter", exc_info=e)
+            
+    #         try:
+    #             logger.info("Creating Sink encoder %d\n",i)
+    #             encoder = Gst.ElementFactory.make("nvv4l2h264enc", f"encoder_{i}") # nvv4l2h264enc
+    #             if not encoder:
+    #                 sys.stderr.write(" Unable to create Sink nvv4l2h264enc \n")
+    #             pipeline.add(encoder)
+    #             encoder.set_property("bitrate", hls_bitrate)
+    #             encoder.set_property("preset-id", preset_level)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink encoder", exc_info=e)
+            
+    #         try:
+    #             logger.info("Creating Sink mux %d\n",i)
+    #             container = Gst.ElementFactory.make("mpegtsmux", f"mux_{i}")
+    #             if not container:
+    #                 sys.stderr.write(" Unable to create Sink mpegtsmux \n")
+    #             pipeline.add(container)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating sink mux", exc_info=e)
+            
+    #         try:
+    #             if not is_aarch64():
+    #                 mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
+    #                 nvvideoconvert.set_property("nvbuf-memory-type", mem_type)
+    #                 nvvidconv_postosd.set_property("nvbuf-memory-type", mem_type)
+    #         except Exception as e:
+    #             logger.error("An error occurred while creating mem_type for sink", exc_info=e)
+            
+    #         try:
+    #             # connect nvstreamdemux -> queue
+    #             padname = "src_%u" %i
+    #             demuxsrcpad = demux.get_request_pad(padname)
+    #             if not demuxsrcpad:
+    #                 sys.stderr.write("Unable to create demux src pad \n")
+    #             queuesinkpad = queue_0.get_static_pad("sink")
+    #             if not queuesinkpad:
+    #                 sys.stderr.write("Unable to create queue sink pad \n")
+    #             demuxsrcpad.link(queuesinkpad)
+    #         except Exception as e:
+    #             logger.error("An error occurred while connecting demux to queue", exc_info=e)
+                
+    #         try:
+    #             queue_0.link(nvvideoconvert)
+    #             nvvideoconvert.link(capsfilter_osd)
+    #             capsfilter_osd.link(nvdsosd)
+    #             nvdsosd.link(queue_1)
+    #             queue_1.link(nvvidconv_postosd)
+    #             nvvidconv_postosd.link(queue_2)
+    #             queue_2.link(capsfilter)
+    #             capsfilter.link(queue_3)
+    #             queue_3.link(encoder)
+    #             encoder.link(parser)
+    #             parser.link(queue_4)
+    #             queue_4.link(container)
+    #             container.link(queue_5)
+    #             queue_5.link(sink)
+    #         except Exception as e:
+    #             logger.error("An error occurred while connecting sink elements in the Pipeline", exc_info=e)
+            
+    # except Exception as e:
+    #     logger.error("An error occurred while creating sink pipeline", exc_info=e)
 
-        DDNS = args[i]['ddns']
-        if DDNS is None or " ":
-            DDNS = ddns_name
-
-        video_info = hls_path + '/' + dev_id_dict[i]['deviceId']
-        if not os.path.exists(video_info):
-            os.makedirs(video_info, exist_ok=True)
-        
-        sink = Gst.ElementFactory.make("hlssink", f"sink_{i}")
-        pipeline.add(sink)
-        devid = dev_id_dict[i]['deviceId']
-        sink.set_property('playlist-root', f'https://{DDNS}/live/{devid}') # Location of the playlist to write
-        # sink.set_property('playlist-root', f'http://localhost:9001/{devid}') # Location of the playlist to write
-        
-        sink.set_property('playlist-location', f'{video_info}/{devid}.m3u8') # Location where .m3u8 playlist file will be stored
-        sink.set_property('location',  f'{video_info}/segment.%01d.ts')  # Location whee .ts segmentrs will be stored
-        sink.set_property('target-duration', 3) # The target duration in seconds of a segment/file. (0 - disabled, useful
-        sink.set_property('playlist-length', 2) # Length of HLS playlist. To allow players to conform to section 6.3.3 of the HLS specification, this should be at least 3. If set to 0, the playlist will be infinite.
-        sink.set_property('max-files', 6) # Maximum number of files to keep on disk. Once the maximum is reached,old files start to be deleted to make room for new ones.
-        
-        # creating queue
-        queue_0 = Gst.ElementFactory.make("queue", f"queue_1_{i}")
-        pipeline.add(queue_0)
-
-        queue_1 = Gst.ElementFactory.make("queue", f"queue_2_{i}")
-        pipeline.add(queue_1)
-        queue_2 = Gst.ElementFactory.make("queue", f"queue_3_{i}")
-        pipeline.add(queue_2)
-        queue_3 = Gst.ElementFactory.make("queue", f"queue_4_{i}")
-        pipeline.add(queue_3)
-        queue_4 = Gst.ElementFactory.make("queue", f"queue_5_{i}")
-        pipeline.add(queue_4)
-        queue_5 = Gst.ElementFactory.make("queue", f"queue_6_{i}")
-        pipeline.add(queue_5)
-
-        parser = Gst.ElementFactory.make("h264parse", f"parse_{i}")
-        pipeline.add(parser)
-
-
-        # creating nvvidconv
-        nvvideoconvert = Gst.ElementFactory.make("nvvideoconvert", f"nvc_{i}")
-        pipeline.add(nvvideoconvert)
-        
-        capsfilter_osd = Gst.ElementFactory.make("capsfilter", f"caps_osd_{i}")
-        pipeline.add(capsfilter_osd)
-        caps_osd = Gst.Caps.from_string("video/x-raw(memory:NVMM), format=RGBA, width=1280, height=720")
-        capsfilter_osd.set_property("caps", caps_osd)
-        
-        # creating nvosd
-        nvdsosd = Gst.ElementFactory.make("nvdsosd", f"osd_{i}")
-        pipeline.add(nvdsosd)
-        nvdsosd.set_property("process-mode", OSD_PROCESS_MODE)
-        nvdsosd.set_property("display-text", OSD_DISPLAY_TEXT)
-        nvvidconv_postosd = Gst.ElementFactory.make("nvvideoconvert", f"nv_post_ods{i}")
-        pipeline.add(nvvidconv_postosd)
-
-        capsfilter = Gst.ElementFactory.make("capsfilter", f"caps_{i}")
-        pipeline.add(capsfilter)
-        caps = Gst.Caps.from_string("video/x-raw(memory:NVMM), width=1280, height=720")
-        capsfilter.set_property("caps", caps)
-        
-        
-        encoder = Gst.ElementFactory.make("nvv4l2h264enc", f"encoder_{i}") # nvv4l2h264enc
-        pipeline.add(encoder)
-        encoder.set_property("bitrate", 1800000)
-        if is_aarch64():
-            encoder.set_property("preset-level", "FastPreset")
-        else:
-            encoder.set_property("preset-id", 2)
-        container = Gst.ElementFactory.make("mpegtsmux", f"mux_{i}")
-        pipeline.add(container)
-        if not is_aarch64():
-            mem_type = int(pyds.NVBUF_MEM_CUDA_UNIFIED)
-            nvvideoconvert.set_property("nvbuf-memory-type", mem_type)
-            nvvidconv_postosd.set_property("nvbuf-memory-type", mem_type)
-        # connect nvstreamdemux -> queue
-        padname = "src_%u" %i
-        demuxsrcpad = demux.get_request_pad(padname)
-        if not demuxsrcpad:
-            sys.stderr.write("Unable to create demux src pad \n")
-        queuesinkpad = queue_0.get_static_pad("sink")
-        if not queuesinkpad:
-            sys.stderr.write("Unable to create queue sink pad \n")
-        demuxsrcpad.link(queuesinkpad)
-        
-        queue_0.link(nvvideoconvert)
-        nvvideoconvert.link(capsfilter_osd)
-        capsfilter_osd.link(nvdsosd)
-        nvdsosd.link(queue_1)
-        queue_1.link(nvvidconv_postosd)
-        nvvidconv_postosd.link(queue_2)
-        queue_2.link(capsfilter)
-        capsfilter.link(queue_3)
-        queue_3.link(encoder)
-        encoder.link(parser)
-        parser.link(queue_4)
-        queue_4.link(container)
-        container.link(queue_5)
-        queue_5.link(sink)
 
 
     # create an event loop and feed gstreamer bus mesages to it

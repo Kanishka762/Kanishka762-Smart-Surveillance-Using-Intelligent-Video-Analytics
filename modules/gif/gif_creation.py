@@ -1,4 +1,5 @@
 from modules.components.load_paths import *
+from init import loadLogger
 import os
 from os.path import join, dirname
 from dotenv import load_dotenv
@@ -12,22 +13,25 @@ import queue
 # import multiprocessing 
 
 result_queue = queue.Queue()
-# cwd = os.getcwd()
-
-# static_path = join(cwd, 'static')
-# gif_path = join(static_path, 'Gif_output')
-
-# data_path = join(cwd, 'data')
-# dotenv_path = join(data_path, '.env')
 load_dotenv(dotenv_path)
-
 ipfs_url = os.getenv("ipfs")
+logger = loadLogger()
 
+gif_dict = {}
+gif_created = {}
 
-# # gif_path = os.getenv("path_gif")
-# print(gif_path)
-# if os.path.exists(gif_path) is False:
-#     os.mkdir(gif_path)
+def create_gif_dictionary(dev_id_dict):
+    try:
+        for key, value in dev_id_dict.items():
+            device_id = value['deviceId']
+            if device_id not in gif_dict:
+                gif_dict[device_id] = []
+            if device_id not in gif_created:
+                gif_created[device_id] = False
+        return gif_dict, gif_created
+    except Exception as e:
+        logger.error("An error occurred while creating gif dictionary", exc_info=e)
+
 def call_gif_push(path, device_meta, gif_batch):
     print("LENGTH OF THE BATCH: ", len(gif_batch))
     with imageio.get_writer(path, mode="I") as writer:
@@ -43,41 +47,20 @@ def call_gif_push(path, device_meta, gif_batch):
 
 async def intermediate(path, device_meta, gif_batch,gif_cid ):
     result_queue.put([path, device_meta, gif_batch, gif_cid])
-    # gifstatus = asyncio.create_task(gif_push(result_queue))
-    # await gifstatus
+    
 def gif_build(img_arr, device_meta, gif_dict, gif_created):
-    
-    
     device_id = device_meta['deviceId']
-      
     # filename for gif
-    video_name_gif = gif_path + '/' + str(device_id)
+    video_name_gif = f'{gif_path}/{str(device_id)}'
     if not os.path.exists(video_name_gif):
         os.makedirs(video_name_gif, exist_ok=True)
-        
-    path = video_name_gif + '/' + 'camera.gif'
-    
+    path = f'{video_name_gif}/camera.gif'
+
     if gif_created[device_id] == False:
         gif_dict[device_id].append(img_arr)
         len_dict = len(gif_dict[device_id])
-
         print(len_dict)
-    
         if(len_dict == 40):
             print("LENGTH OF DICTIONARY: ",len_dict)
             gif_created[device_id] = True
-            # asyncio.run(call_gif_push(path, device_meta, gif_dict[device_id][-100:]))
-            # asyncio.create_task(gif_push(path, device_meta, gif_dict[device_id][-100:]))
             call_gif_push(path, device_meta, gif_dict[device_id][-100:])
-            # threading.Thread(target=call_gif_push,args=(path, device_meta, gif_dict[device_id][-100:],)).start()
-            
-        # gif_push(path, device_meta, gif_dict[device_id][-100:])
-        
-    
-    # print(f"DEVICE ID:{device_id} ---------->  LENGTH OF DEVICE ID:{len_dict}")
-    
-    # if(skip_dict[device_id] < 300 and skip_dict[device_id]>200):
-    #     img_arr_cp = img_arr.copy()
-    #     gif_dict[device_id].append(img_arr)
-    # elif(skip_dict[device_id] == 300):
-    #     threading.Thread(target=gif_push,args=(path, device_info, gif_dict[device_id]),).start()

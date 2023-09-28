@@ -17,7 +17,7 @@ from modules.db.db_fetch_devices import filter_devices
 from modules.db.db_fetch_members import fetch_db_mem
 from modules.components.rtsp_check import check_rtsp_stream
 from modules.face_recognition_pack.membersSubscriber import startMemberService
-from modules.face_recognition_pack.recog_objcrop_face import load_lmdb_fst
+from modules.face_recognition_pack.recog_objcrop_face import memberQueueService
 
 mem_data_queue = queue.Queue()
 logger = loadLogger()
@@ -28,6 +28,7 @@ rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
 
 def create_device_dict():
     try:
+        memberQueueServiceObj = memberQueueService()
         device_det = filter_devices()
         dev_details = []
 
@@ -44,9 +45,7 @@ def create_device_dict():
                 "rtsp": "file:///home/srihari/facerecog.mp4",
                 "password": chunk[9],
                 "subscriptions": [
-                    'Activity',
-                    'Fire/Smoke',
-                    'Dangerous-Object'
+                    'Facial-Recognition'
                 ],
                 "lat": chunk[11],
                 "long": chunk[12],
@@ -61,7 +60,7 @@ def create_device_dict():
         for devs in dev_details:
             if 'Facial-Recognition' in devs["subscriptions"]:
                 threading.Thread(target = startMemberService, args=(mem_data_queue,)).start()
-                threading.Thread(target=load_lmdb_fst, args=(mem_data_queue,)).start()
+                threading.Thread(target=memberQueueServiceObj.load_lmdb_fst, args=(mem_data_queue,)).start()
                 mem_data = fetch_db_mem()
                 mem_data_queue.put(mem_data)
 

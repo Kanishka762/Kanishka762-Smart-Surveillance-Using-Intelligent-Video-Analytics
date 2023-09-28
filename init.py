@@ -35,6 +35,11 @@ if os.path.exists(frame_path):
     remove_cnts(frame_path)
 if not os.path.exists(frame_path):
     os.makedirs(frame_path)
+    
+if os.path.exists(crop_path):
+    remove_cnts(crop_path)
+if not os.path.exists(crop_path):
+    os.makedirs(crop_path)
 
 if os.path.exists(logs_path):
     remove_cnts(logs_path)

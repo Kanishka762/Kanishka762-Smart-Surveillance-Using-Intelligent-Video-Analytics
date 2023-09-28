@@ -37,6 +37,64 @@ track_type = ast.literal_eval(os.getenv("track_type"))
 
 ack = False
 
+check_member_query = """
+                        SELECT id FROM "Member" WHERE id = %(mem_DID)s
+                    """
+
+mem_insert_query = """
+                        WITH inserted_member AS (
+                        INSERT INTO "Member" (id, type, "tenantId", track, "blackListed", faceid, "createdAt", "updatedAt")
+                        VALUES (%(mem_DID)s, %(type)s, %(tenantId)s, %(track)s, %(blackListed)s, %(faceid)s, NOW(), NOW())
+                        RETURNING id
+                        ),
+                        inserted_tags AS (
+                        INSERT INTO "Tags" (id, "tenantId", name, active, "memberId", "deviceId", "taggableType", "createdAt", "updatedAt")
+                        VALUES (uuid_generate_v4(), %(tenantId)s, %(type)s, %(active)s, (SELECT id FROM inserted_member), %(deviceId)s, %(taggableType)s,NOW() , NOW())
+                        RETURNING id
+                        ),
+                        inserted_member_tags AS (
+                        INSERT INTO "MemberTags" ("memberId", "tagId", "createdAt", "updatedAt")
+                        VALUES ((SELECT id FROM inserted_member), (SELECT id FROM inserted_tags), NOW(), NOW())
+                        RETURNING "memberId"
+                        )
+                        SELECT * 
+                        FROM (
+                            SELECT * FROM inserted_member
+                            UNION ALL
+                            SELECT * FROM inserted_tags
+                            UNION ALL
+                            SELECT * FROM inserted_member_tags
+                        )AS inserted_rows;
+                    """
+
+mem_update_query = """
+                        WITH updated_activities AS (
+                        UPDATE "Activities"
+                        SET "memberId" = %(memberId)s, title = %(title)s
+                        WHERE "batchId" = %(batchId)s
+                        RETURNING id
+                        ),
+                        updated_logs AS (
+                        UPDATE "Logs"
+                        SET track = %(track)s, "memberId" = %(mem_DID)s
+                        WHERE "activityId" IN (SELECT id FROM updated_activities) AND "_id" = %(track_id)s
+                        RETURNING id
+                        ),
+                        inserted_member_logs AS (
+                        INSERT INTO "MemberLogs" ("memberId", "logId", "createdAt", "updatedAt")
+                        VALUES (%(mem_DID)s, (SELECT id FROM updated_logs), NOW(), NOW())
+                        RETURNING "memberId"
+                        )
+                        SELECT * 
+                        FROM (
+                            SELECT * FROM updated_activities
+                            UNION ALL
+                            SELECT * FROM updated_logs
+                            UNION ALL
+                            SELECT * FROM inserted_member_logs
+                        )AS inserted_rows;
+                    """
+
 
 def dbpush_activities(act_out):
 
@@ -58,17 +116,17 @@ def dbpush_activities(act_out):
             if obj['activity'] is None:
                 obj['activity'] = ''
         
-        num_people = len([item for item in data if item['class'] == 'Male' or item['class'] == 'Female'])
-        activities = list(set([item['activity'] for item in data if item['activity'] is not None])) or [None]
-        if activities is None:
-            activity_string = 'detected'
-        else:
-            activity_string = ' and '.join(activities)
+        # num_people = len([item for item in data if item['class'] == 'Male' or item['class'] == 'Female'])
+        # activities = list(set([item['activity'] for item in data if item['activity'] is not None])) or [None]
+        # if activities is None:
+        #     activity_string = 'detected'
+        # else:
+        #     activity_string = ' and '.join(activities)
             
-        if num_people == 1:
-            title = f"1 person {activity_string}"
-        else:
-            title = f"{num_people} people {activity_string}"
+        # if num_people == 1:
+        #     title = f"1 person {activity_string}"
+        # else:
+        #     title = f"{num_people} people {activity_string}"
         
         if act_out["type"] == "anomaly":
             category_type = "ANOMALIE"
@@ -108,9 +166,9 @@ def dbpush_activities(act_out):
             RETURNING id
             ),
             inserted_logs AS (
-            INSERT INTO "Logs" (id, "tenantId", "_id", class, track, activity, cid, "memberId", "activityId", "createdAt", "updatedAt")
-            SELECT uuid_generate_v4(), %(tenantId)s, object->>'id', object->>'class', object->>'track', CASE WHEN object->>'activity' <> '' THEN object->>'activity' ELSE NULL END, object->>'cids', %(memberId)s, inserted_activity.id, NOW(), NOW()
-            FROM inserted_activity, jsonb_array_elements(%(objects)s) AS object
+            INSERT INTO "Logs" (id, "tenantId", "_id", class, track, activity, cid, "timeInPlace", "memberId", "activityId", "geoId", "createdAt", "updatedAt")
+            SELECT uuid_generate_v4(), %(tenantId)s, object->>'id', object->>'class', object->>'track', CASE WHEN object->>'activity' <> '' THEN object->>'activity' ELSE NULL END, object->>'cids', %(timestamp)s, %(memberId)s, inserted_activity.id, inserted_geo.id, NOW(), NOW()
+            FROM inserted_activity, inserted_geo, jsonb_array_elements(%(objects)s) AS object
             RETURNING id
             ),
             inserted_images2 AS (
@@ -140,7 +198,7 @@ def dbpush_activities(act_out):
         'batchId': act_out['batchid'], 
         'memberId': None, 
         'location': str(loc_name), 
-        'title': title, 
+        'title': act_out['metaData']['title'], 
         'timestamp': act_out['timestamp'], 
         'score': None, 
         'deviceId': act_out['deviceid'],
@@ -186,83 +244,111 @@ def dbpush_members(mem_out):
         print("PUSHING THE MEMBER CONTENTS TO DB")
         
         # Establish a connection to the PostgreSQL database
-        connection = psycopg2.connect(host=pg_url, database=pgdb, port=pgport, user=pguser, password=pgpassword)
+        connection = psycopg2.connect(host="164.52.212.191", database="postgres", port="26257", user="root", password="User123")
         # Create a cursor object
         cursor=connection.cursor(cursor_factory=RealDictCursor)
                 
         for item in mem_out['metaData']['object']:
             # if((item['track'] is not None) and (item['memDID'] is not None)):
-            if((item['track'] == "10") and (item['memDID'] is not None)):
+            if((item['track'] == "00" or (item['track'] == "01")) and (item['memDID'] is not None)):
+                print("Got whitelist/blacklist member")
+                memDID = item['memDID'][2:]
+                
+                cursor.execute(check_member_query,{
+                'mem_DID': memDID
+                })
+                member_exists = cursor.fetchone()
+                if member_exists:
+                    print(f"Member ID:{memDID} exists in Member table")
+                
+                    cursor.execute(mem_update_query,{ 
+                    'track': item['track'],
+                    'memberId': None,
+                    'batchId': mem_out['batchid'],
+                    'title': mem_out['metaData']['title'],
+                    'track_id': item['id'],
+                    'mem_DID': memDID
+                    })              
+                
+                # Fetch all inserted rows
+                update_rows = cursor.fetchall()
+                print("UPDATE ROWS: ", update_rows)
+                
+            if((item['track'] == "10")) and (item['memDID'] is not None):
+                print("Got unknown member")
                 type_track = track_type[item['track']]
-                is_blacklist = False
-                # if(item['track'] == "01"):
-                #     is_blacklist = True
-                # else:
-                #     is_blacklist = False
-                query = """
-                        WITH inserted_member AS (
-                        INSERT INTO "Member" (id, type, "tenantId", track, "blackListed", faceid, "createdAt", "updatedAt")
-                        VALUES (uuid_generate_v4(), %(type)s, %(tenantId)s, %(track)s, %(blackListed)s, %(faceid)s, NOW(), NOW())
-                        RETURNING id
-                        ),
-                        inserted_tags AS (
-                        INSERT INTO "Tags" (id, "tenantId", name, active, "memberId", "deviceId", "taggableType", "createdAt", "updatedAt")
-                        VALUES (uuid_generate_v4(), %(tenantId)s, %(type)s, %(active)s, (SELECT id FROM inserted_member), %(deviceId)s, %(taggableType)s,NOW() , NOW())
-                        RETURNING id
-                        ),
-                        inserted_member_tags AS (
-                        INSERT INTO "MemberTags" ("memberId", "tagId", "createdAt", "updatedAt")
-                        VALUES ((SELECT id FROM inserted_member), (SELECT id FROM inserted_tags), NOW(), NOW())
-                        RETURNING "memberId"
-                        ),
-                        updated_activities AS (
-                        UPDATE "Activities"
-                        SET "memberId" = %(memberId)s
-                        WHERE "batchId" = %(batchId)s
-                        RETURNING id
-                        ),
-                        updated_logs AS (
-                        UPDATE "Logs"
-                        SET track = %(track)s, "memberId" = (SELECT id FROM inserted_member)
-                        WHERE "activityId" IN (SELECT id FROM updated_activities)
-                        RETURNING id
-                        )
-                        SELECT * 
-                        FROM (
-                            SELECT * FROM inserted_member
-                            UNION ALL
-                            SELECT * FROM inserted_tags
-                            UNION ALL
-                            SELECT * FROM inserted_member_tags
-                            UNION ALL
-                            SELECT * FROM updated_activities
-                            UNION ALL
-                            SELECT * FROM updated_logs
-                        )AS inserted_rows;
-                    """
-            
-                cursor.execute(query,{
+                memDID = item['memDID'][2:]
+                
+                cursor.execute(mem_insert_query,{ 
                 'type': type_track,
                 'tenantId': mem_out['tenantId'], 
                 'track': item['track'],
-                'blackListed': is_blacklist,
+                'blackListed': False,
                 'faceid': '{' + item['cids'] + '}',
                 'active': True,
                 'deviceId': mem_out['deviceid'],
                 'taggableType': 'Member',
-                'memberId': None,
-                'batchId': mem_out['batchid'], 
-                })                   
+                'mem_DID': memDID
+                })
                 
                 # Fetch all inserted rows
-                rows = cursor.fetchall()
+                insert_rows = cursor.fetchall()
+                print("INSERT ROWS: ", insert_rows)
                 
-                # print(rows)
-
-                # Print the inserted rows
-                for row in rows:
-                    print(row)
-                        
+                cursor.execute(mem_update_query,{ 
+                'track': item['track'],
+                'memberId': None,
+                'batchId': mem_out['batchid'],
+                'title': mem_out['metaData']['title'],
+                'track_id': item['id'],
+                'mem_DID': memDID
+                })              
+                
+                # Fetch all inserted rows
+                update_rows = cursor.fetchall()
+                print("UPDATE ROWS: ", update_rows)
+                
+            if((item['track'] == "11")) and (item['memDID'] is not None):
+                print("Got unknown repeat member")
+                type_track = track_type[item['track']]
+                memDID = item['memDID'][2:]
+                
+                cursor.execute(check_member_query,{
+                'mem_DID': memDID
+                })
+                member_exists = cursor.fetchone()
+                if member_exists:
+                    print(f"Member ID:{memDID} exists in Member table")
+                else:
+                    cursor.execute(mem_insert_query,{ 
+                    'type': type_track,
+                    'tenantId': mem_out['tenantId'], 
+                    'track': item['track'],
+                    'blackListed': False,
+                    'faceid': '{' + item['cids'] + '}',
+                    'active': True,
+                    'deviceId': mem_out['deviceid'],
+                    'taggableType': 'Member',
+                    'mem_DID': memDID
+                    })
+                    
+                    # Fetch all inserted rows
+                    insert_rows = cursor.fetchall()
+                    print("INSERT ROWS: ", insert_rows)
+                    
+                cursor.execute(mem_update_query,{ 
+                'track': item['track'],
+                'memberId': None,
+                'batchId': mem_out['batchid'],
+                'title': mem_out['metaData']['title'],
+                'track_id': item['id'],
+                'mem_DID': memDID
+                })              
+                
+                # Fetch all inserted rows
+                update_rows = cursor.fetchall()
+                print("UPDATE ROWS: ", update_rows)
+      
         # Commit the changes and close the connection
         connection.commit()
         cursor.close()

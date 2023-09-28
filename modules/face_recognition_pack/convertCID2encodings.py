@@ -13,9 +13,9 @@ load_dotenv(dotenv_path)
 ipfs_url = os.getenv("ipfs")
 
 def randomword():
-    length = 7 
+    length = 7
     letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(length))
+    return ''.join(random.choice(letters) for _ in range(length))
 
 
 def cid_to_imagenumpy(cid):
@@ -23,10 +23,9 @@ def cid_to_imagenumpy(cid):
     #'ipfs --api={ipfs_url} add {file_path} -Q'.format(ipfs_url=ipfs_url, file_path=src_file)
     command = 'ipfs --api={ipfs_url} get {cid}'.format(ipfs_url=ipfs_url,cid=cid)
     output = sp.getoutput(command)
-    im_path = image_path+'/'+str(cid)+".jpg"
+    im_path = f'{image_path}/{str(cid)}.jpg'
     os.rename(cid, im_path)
-    faceNumpy = cv2.imread(im_path)
-    return faceNumpy
+    return cv2.imread(im_path)
 
 def faceNumpy2encodings(faceNumpy):
     try:
@@ -37,19 +36,8 @@ def faceNumpy2encodings(faceNumpy):
         # print(end_time - start_time)
         print(f"Elapsed time: {end_time - start_time} seconds")
         return encoding
-    except:
-        randd = randomword()
-        print("*******&&&&&&&&&&*********")
-        print("*******&&&&&&&&&&*********")
-        print("*******&&&&&&&&&&*********")
-
-        # cv2.imwrite("/home/srihari/deepstreambackend/faceerrors/"+randd+".jpg",faceNumpy)
-        print("*******&&&&&&&&&&*********")
-        print("*******&&&&&&&&&&*********")
-        print("*******&&&&&&&&&&*********")
-
-        pass
-
+    except Exception as e:
+        print(e)
 
 def convertMemData2encoding(MemberPublish):
     list_of_members =  MemberPublish["member"]
