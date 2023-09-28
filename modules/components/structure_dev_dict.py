@@ -26,7 +26,7 @@ load_dotenv(dotenv_path)
 
 rtsp_links = ast.literal_eval(os.getenv("rtsp_links"))
 
-def create_device_dict():
+def create_device_dict():  # sourcery skip: remove-unused-enumerate
     try:
         memberQueueServiceObj = memberQueueService()
         device_det = filter_devices()
@@ -42,17 +42,17 @@ def create_device_dict():
                 "port": chunk[5],
                 "videoEncodingInformation": 'H265',
                 "username": chunk[7],
-                "rtsp": "file:///home/srihari/facerecog.mp4",
+                # "rtsp": "file:///home/srihari/facerecog.mp4",
+                "rtsp": chunk[8],
                 "password": chunk[9],
-                "subscriptions": [
-                    'Facial-Recognition'
-                ],
+                # "subscriptions": ['Facial-Recognition'],
+                "subscriptions": chunk[10],
                 "lat": chunk[11],
                 "long": chunk[12],
             }
             dev_details.append(device_dict)
-            if (i==0):
-                break
+            # if (i==0):
+            #     break
     except Exception as e:
         logger.error("An error occurred while structuring device details", exc_info=e)
 
