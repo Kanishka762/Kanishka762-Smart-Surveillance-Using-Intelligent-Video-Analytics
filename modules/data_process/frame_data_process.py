@@ -1,30 +1,21 @@
 from modules.components.load_paths import *
 from init import loadLogger
 
-import torch
 from pathlib import Path
 import os
 import cv2
-import uuid
-import copy
 import subprocess as sp
-from os.path import join, dirname
+# from os.path import join, dirname
 from dotenv import load_dotenv
 import ast
 import nats, json
 import numpy as np
-import asyncio
 import lmdb
-import threading
-from torch.multiprocessing import Process, set_start_method
-from modules.deepstream.rtsp2rtsp import framedata_queue
-from collections import deque
 
-from modules.alarm.alarm_light_trigger import alarm
-from modules.components.batchdata2json import output_func
-from modules.db.db_insert import dbpush_activities, dbpush_members
+# from collections import deque
+
+from modules.db.db_insert import dbpush_members
 from modules.face_recognition_pack.recog_objcrop_face import FaceRecognition
-from modules.mini_mmaction.demo.demo_spatiotemporal_det import activity_main
 from modules.lmdbSubmodules.liveStreamLabelGen import lmdboperations
 from modules.data_process.labelTitle import fetch_batch_title
 
@@ -44,7 +35,6 @@ alarm_config = os.getenv("alarm_config")
 
 anamoly_object = ast.literal_eval(os.getenv("anamoly_object"))
 anamoly = ast.literal_eval(os.getenv("anamoly"))
-anamolyMemberCategory = ast.literal_eval(os.getenv('anamolyMemberCategory'))
 batch_size = int(os.getenv("batch_size"))
 
 db_env = lmdb.open(f'{lmdb_path}/face-detection', max_dbs=10)
@@ -53,14 +43,13 @@ trackIdMemIdDictDB = db_env.open_db(b'trackIdMemIdDictDB', create=True)
 
 batch = []
 frame_cnt = 0
-isolate_queue = {}
 
 #TODO: 
 #move to .env 
 trigger_age = 50
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
+#TODO:convert into class
 def conv_path2cid(pathh):
     try:
         # logger.info("trying to convert path to cid in json")
@@ -72,6 +61,7 @@ def conv_path2cid(pathh):
     except Exception as e:
         logger.error("An error occurred while converting path to cid", exc_info=e)
 
+#TODO:convert into class
 def conv_jsonnumpy_2_jsoncid(primary):
     try:
         # logger.info("trying to convert numpy to cid in json")
@@ -124,6 +114,8 @@ def updateData(data_dict, new_member_id):
 
 def updateLMDBAndDataVar(listOfCrops, detection):
     try:
+        logger.info("inside updateLMDBAndDataVar")
+
         FaceRecognitionObj = FaceRecognition()
         lmdboperationsobj = lmdboperations()
         with db_env.begin(db=trackIdMemIdDictDB, write=True) as db_txn:
@@ -173,8 +165,9 @@ def updateObjectMetaData(output_json):
     except Exception as e:
         logger.error("An error occurred during updating face by removing duplicate track ids and output json meta", exc_info=e)
 
-def mapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res):
+def mapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res, data):
     try:
+        logger.info(trackIdMemIdDict)
         if trackIdMemIdDict[objId][0] != '100':
             data,keys_to_remove = updateData(data, trackIdMemIdDict[objId][0])
             idsToBeRemoved.extend(iter(keys_to_remove))
@@ -188,7 +181,7 @@ def mapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res)
     except Exception as e:
         logger.error("An error occurred during mapping Object ID With Activity", exc_info=e)
 
-def createAndmapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res):
+def createAndmapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res, data):
     try:
         actList = [act_batch_res[int(objId)]]
         if trackIdMemIdDict[objId][0] != '100':
@@ -201,6 +194,8 @@ def createAndmapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_b
 
 def mapIdActivityInLabelinfo(act_batch_res, trackIdMemIdDict, idsToBeRemoved):
     try:
+        logger.info("inside mapIdActivityInLabelinfo")
+        
         lmdboperationsobj = lmdboperations()
         for objId in act_batch_res:
             objId = str(objId)
@@ -208,22 +203,23 @@ def mapIdActivityInLabelinfo(act_batch_res, trackIdMemIdDict, idsToBeRemoved):
             if objId in trackIdMemIdDict:
                 with db_env.begin(db=IdLabelInfoDB, write=True) as db_txn:
                     data = lmdboperationsobj.fetchLMDB(db_txn, "IdLabelInfo")
-                if data is None:
-                    data = {}
-                elif objId in data:
-                    data = mapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res)
-                else:
-                    data = createAndmapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res)
-                # logger.info("insertLMDB error debug")
-                lmdboperationsobj.insertLMDB(db_txn, "IdLabelInfo", data)
-                logger.info("updateddata after face recognition", data)
-                logger.info("\n")
+                    if data is None:
+                        data = {}
+                    elif objId in data:
+                        data = mapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res, data)
+                    else:
+                        data = createAndmapObjIDWithActivity(trackIdMemIdDict, objId, idsToBeRemoved, act_batch_res, data)
+                    # logger.info("insertLMDB error debug")
+                    lmdboperationsobj.insertLMDB(db_txn, "IdLabelInfo", data)
+                    logger.info("updateddata after face recognition")
+                    logger.info(data)
         return idsToBeRemoved
     except Exception as e:
         logger.error("An error occurred during updating LMDB (mapping Object ID With Activity)", exc_info=e)
 
 def face_recognition_process(output_json, device_id, act_batch_res):
     try:
+        logger.info("inside face_recognition_process")
         lmdboperationsobj = lmdboperations()
         idsToBeRemoved = []
         logger.info("started face recognition")
@@ -263,6 +259,7 @@ def face_recognition_process(output_json, device_id, act_batch_res):
         logger.error("An error occurred during facial recognition", exc_info=e)        
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#TODO:convert into class
 async def json_publish_activity(primary):
     try:
         logger.info('starting to publish anomalies through nats')
@@ -276,332 +273,4 @@ async def json_publish_activity(primary):
         logger.info("Activity is getting published")
     except Exception as e:
         logger.error("An error occurred while publishing the anomaly", exc_info=e)
-
-#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-def merge_activity(act_batch_res, output_json):
-    try:
-        logger.info('starting merge_activity function')
-        if len(output_json['metaData']['object'])>0:
-            for obj in output_json['metaData']['object']:
-                if int(obj["id"]) in act_batch_res:
-                    obj["activity"] = act_batch_res[int(obj["id"])]
-        return output_json
-    except Exception as e:
-        logger.error("An error occurred merge_activity function", exc_info=e)
-
-def updateLabelInfo(data, act_batch_res,objId):
-    try:
-        if data is None:
-            actList = [act_batch_res[int(objId)]]
-            data = {objId: {"memberID": None, "activity": actList}}
-        elif objId in data:
-            if len(data[objId]["activity"]) >= 4:
-                data[objId]["activity"].pop(0)
-            data[objId]["activity"].append(act_batch_res[int(objId)])
-        else:
-            actList = [act_batch_res[int(objId)]]
-            data[objId] = {"memberID":None,"activity":actList}
-        return data
-    except Exception as e:
-        logger.error("An error occurred while updating label info in LMDB", exc_info=e)
-
-def updateOutputJsonWithActivity(org_frames_lst,bbox_tensor_lst,obj_id_ref, subscriptions, output_json):
-    act_batch_res={}
-    try:
-        lmdboperationsobj = lmdboperations()
-        if 'Activity' in subscriptions:
-            act_batch_res = activity_main(org_frames_lst,bbox_tensor_lst,obj_id_ref)
-            for objId in act_batch_res:
-                objId = str(objId)
-                
-                with db_env.begin(db=IdLabelInfoDB, write=True) as db_txn:
-                    data = lmdboperationsobj.fetchLMDB(db_txn, "IdLabelInfo")
-                    data = updateLabelInfo(data, act_batch_res,objId)
-                    lmdboperationsobj.insertLMDB(db_txn, "IdLabelInfo", data)
-            output_json = merge_activity(act_batch_res, output_json)
-        return output_json, act_batch_res
-    except Exception as e:
-        logger.error("An error occurred while updating output json with activity", exc_info=e)
-
-def updateOutputJsonWithMetadatas(output_json, device_data, device_id, device_id_new, device_timestamp, fin_full_frame):
-    try:
-        batchId = str(uuid.uuid4())
-        output_json["tenantId"] = device_data[device_id]['tenantId']
-        output_json["batchid"] = batchId
-        output_json["deviceid"] = device_id_new
-        output_json["timestamp"] = str(device_timestamp)
-        output_json['geo']['latitude'] = device_data[device_id]['lat']
-        output_json['geo']['longitude'] = device_data[device_id]['long']
-        output_json["metaData"]['detect'] = len(output_json["metaData"]['object'])
-        output_json["metaData"]['count']["peopleCount"] = len(output_json["metaData"]['object'])
-        output_json["version"] = "v0.0.4"
-        if fin_full_frame is not None:
-            output_json["metaData"]["cid"] = fin_full_frame
-        return output_json
-    except Exception as e:
-        logger.error("An error occurred while updating output json with metadatas", exc_info=e)
-
-def checkForActivityAlarm(subscriptions):
-    try:
-        if "Alarm" in subscriptions:
-            logger.info("alarm trigger for activities")
-            alarm()
-    except Exception as e:
-        logger.error("alarm is not connected / couldn't connect to alarm", exc_info=e) 
-
-def processOutputjsonForDBPush(output_json):
-    try:
-        output_json = fetch_batch_title(output_json)
-        output_json_fr = copy.deepcopy(output_json)
-
-        output_json = conv_jsonnumpy_2_jsoncid(output_json)
-
-        for detection in output_json['metaData']['object']:
-            del detection['cropsNumpyList']   
-        return output_json,output_json_fr
-    except Exception as e:
-        logger.error("An error occurred while processing output json", exc_info=e)
-
-def checkForAnomaly(output_json):
-    #TODO:check the condition
-    try:
-        return(
-        [
-            True
-            for each in [
-                each["activity"]
-                for each in output_json['metaData']['object']
-            ]
-            if each in anamoly
-        ]
-        or [
-            True
-            for each in [
-                each["class"]
-                for each in output_json['metaData']['object']
-            ]
-            if each in anamoly_object
-        ]
-        or [
-            True
-            for each in [
-                each["track"]
-                for each in output_json['metaData']['object']
-            ]
-            if each in anamolyMemberCategory
-        ])
-    except Exception as e:
-        logger.error("An error occurred while creating flag for anomaly", exc_info=e)
-
-def publishPushProcessOutputJson(subscriptions, output_json, AnomalyFlag, output_json_fr,device_id, act_batch_res):
-    try:
-        #TODO:handle else case
-        if 'Bagdogra' not in subscriptions:
-            status = dbpush_activities(output_json)
-            if(status == "SUCCESS!!"):
-                if AnomalyFlag:
-                    asyncio.run(json_publish_activity(primary=output_json))
-                logger.info("DB insertion successful :)")
-                if 'Facial-Recognition' in subscriptions:
-                    face_recognition_process(output_json_fr,device_id, act_batch_res)
-                    # asyncio.create_task(face_recognition_process(output_json_fr,device_id))
-                    # threading.Thread(target = face_recognition_process,args = (output_json_fr,device_id,)).start()
-            elif(status == "FAILURE!!"):
-                logger.info("DB insertion got failed :(")
-        
-    except Exception as e:
-        logger.error("An error occurred while publishing/pushing the output json", exc_info=e)
-
-def anomalyTagAndTrigger(subscriptions, output_json):
-    try:
-        if AnomalyFlag := checkForAnomaly(output_json):
-            threading.Thread(target = checkForActivityAlarm,args = (subscriptions,)).start()
-            output_json["type"] = "anomaly"
-        return output_json, AnomalyFlag
-    except Exception as e:
-        logger.error("An error occurred while anomaly tag and trigger", exc_info=e)
-
-def process_results(device_id, device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame):
-    try:
-        logger.info("entering process results")
-        subscriptions = device_data[device_id]["subscriptions"]
-        output_json, act_batch_res = updateOutputJsonWithActivity(org_frames_lst,bbox_tensor_lst,obj_id_ref, subscriptions, output_json)
-
-        if output_json['metaData']['object']:
-            output_json = updateOutputJsonWithMetadatas(output_json, device_data, device_id, device_id_new, device_timestamp, fin_full_frame)
-            output_json, AnomalyFlag = anomalyTagAndTrigger(subscriptions, output_json)
-            output_json,output_json_fr = processOutputjsonForDBPush(output_json)
-            logger.info("THE OUTPUT JSON STRUCTURE: ",output_json)
-            publishPushProcessOutputJson(subscriptions, output_json, AnomalyFlag, output_json_fr,device_id, act_batch_res)
-
-    except Exception as e:
-        logger.error("error in processing the results", exc_info=e)
-        
-def process_publish(device_id,batch_data,device_data,device_timestamp):
-    try:
-        logger.info(f"got batch data for device ID:+{str(device_id)}")
-        
-        global anamoly_object, anamoly
-        device_id_new = device_data[device_id]["deviceId"]
-        detectss = 0
-        fin_full_frame = None
-
-        for each in batch_data:
-            if each["total_detects"] > detectss:
-                detectss = each["total_detects"]
-                fin_full_frame = each["det_frame"]
-        
-        bbox_tensor_lst = [frame_data["bbox_tensor"] for frame_data in batch_data]
-        org_frames_lst = [frame_data["org_frame"] for frame_data in batch_data]
-        obj_id_ref = [frame_data["bbox_ref_list"] for frame_data in batch_data]
-
-        try:
-            output_json = output_func(batch_data,device_id,device_timestamp)
-        except Exception as e:
-            logger.error("An error occurred outside function output_func", exc_info=e)
-        
-        try:
-            threading.Thread(target = process_results, args = (device_id, device_data,device_timestamp, org_frames_lst, obj_id_ref, output_json, bbox_tensor_lst, device_id_new,fin_full_frame,)).start()
-        except Exception as e:
-            logger.error("An error occurred outside function process_results", exc_info=e)
-            
-    except Exception as e:
-        logger.error("An error occurred during structuring output json", exc_info=e)
-#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-def loadVariableForFrame2Dict(inputt,dev_id_dict):
-    try:
-        global anamoly_object, anamoly
-        global trigger_age
-        device_id = inputt["camera_id"]
-        subscriptions = dev_id_dict[device_id]["subscriptions"]
-        frame_timestamp = inputt["frame_timestamp"]
-        frame_data = []
-        bbox_list = []
-        bbox_ref_list = []
-        
-        return anamoly_object, trigger_age, device_id, subscriptions, frame_timestamp, frame_data, bbox_list, bbox_ref_list
-    except Exception as e:
-        logger.error("An error occurred while loading variable for frametodict", exc_info=e)
-
-def checkForAnomalousObject(objectt, anamoly_object, trigger_age):
-    try:
-        return (
-            objectt["detect_type"] in anamoly_object
-            and objectt["age"] > trigger_age
-        )
-    except Exception as e:
-        logger.error("An error occurred while checking for anomalous object to trigger alarm", exc_info=e)
-
-def checkForobjectAlarm(objectt, anamoly_object, trigger_age, subscriptions):
-    try:
-        if "Alarm" in subscriptions and checkForAnomalousObject(objectt, anamoly_object, trigger_age):
-            trigger_age = trigger_age + 1
-            print(f"Alarm triggered for {objectt['detect_type']} age: {str(objectt['age'])}")
-            try:
-                alarm()
-            except Exception:
-                print("alarm is not connected / couldn't connect to alarm")
-    except Exception as e:
-        logger.error("An error occurred while checking for object alarm", exc_info=e)
-
-def structureobjdict(object_data):
-    try:
-        return {
-                object_data["obj_id"]: {
-                    "type": object_data["detect_type"],
-                    "activity": "No Activity",
-                    "confidence": object_data["confidence_score"],
-                    "did": None,
-                    "track_type": None,
-                    "crops": [object_data["crop"]]
-                }
-            }
-    except Exception as e:
-        logger.error("An error occurred while structing object dict for frametodict", exc_info=e)
-
-def createBBocCoord(object_data, bbox_ref_list, bbox_list):
-    try:
-        bbox_coord = [object_data["bbox_left"], object_data["bbox_top"], object_data["bbox_right"], object_data["bbox_bottom"]]
-        bbox_ref_list.append(object_data["obj_id"])
-        bbox_list.append(bbox_coord)
-        return bbox_ref_list, bbox_list
-    except Exception as e:
-        logger.error("An error occurred while creating bbox coord for frametodict", exc_info=e)
-
-def createObjectsDict(inputt, subscriptions, frame_data, bbox_ref_list, bbox_list, trigger_age, anamoly_object):
-    try:
-        if len(inputt["objects"]) > 0:
-            for object_data in inputt["objects"]:
-                # #object_data['crop']
-                # reid = func(object_data['crop'])
-                threading.Thread(target = checkForobjectAlarm,args = (object_data, anamoly_object, trigger_age, subscriptions,)).start()
-                obj_dict = structureobjdict(object_data)
-
-                frame_data.append(obj_dict)
-
-                if object_data["detect_type"] in ["Male", "Female"]:
-                    bbox_ref_list, bbox_list = createBBocCoord(object_data, bbox_ref_list, bbox_list)
-        return frame_data, bbox_ref_list, bbox_list
-    except Exception as e:
-        logger.error("An error occurred while creating objects dict for frametodict", exc_info=e)
-
-def batchingFrames(device_id, finalFrameDict, dev_id_dict, frame_timestamp):
-    try:
-        if device_id not in isolate_queue:
-            isolate_queue[device_id] = []
-        isolate_queue[device_id].append(finalFrameDict)
-        for each in isolate_queue:
-            if len(isolate_queue[each])>batch_size:
-                batch_data = isolate_queue[each]
-                isolate_queue[each] = []
-                #TODO:put in queue
-                logger.info("sending a batch of frames to process")
-                process_publish(device_id,batch_data,dev_id_dict, frame_timestamp)
-                # asyncio.create_task(process_publish(device_id,batch_data,dev_id_dict, frame_timestamp))
-    except Exception as e:
-        logger.error("An error occurred while batching frames", exc_info=e)
-
-def structureFinalFrameDict(inputt,frame_data, cidd, bbox_array, bbox_ref_list):
-    try:
-        return{
-            "frame_id":inputt["frame_number"],
-        "detection_info":frame_data,
-        "cid":cidd, 
-        "bbox_tensor":bbox_array, 
-        "org_frame":inputt["org_frame"], 
-        "bbox_ref_list":bbox_ref_list, 
-        "total_detects":inputt["total_detect"], 
-        "det_frame":cidd
-        }
-    except Exception as e:
-        logger.error("An error occurred while structing final frame dict for frametodict", exc_info=e)
-
-def frame_2_dict():
-    while True:
-        try:
-            inputt, dev_id_dict = framedata_queue.get()
-            # print(inputt,"Main inputt dict")
-            
-            anamoly_object, trigger_age, device_id, subscriptions, frame_timestamp, frame_data, bbox_list, bbox_ref_list = loadVariableForFrame2Dict(inputt,dev_id_dict)
-
-            frame_data, bbox_ref_list, bbox_list = createObjectsDict(inputt, subscriptions, frame_data, bbox_ref_list, bbox_list, trigger_age, anamoly_object)
-            bbox_np = np.array(bbox_list, dtype=np.float32)
-            bbox_array = np.reshape(bbox_np, (-1, 4))
-            cidd = [inputt["np_arr"]]
-            finalFrameDict = structureFinalFrameDict(inputt,frame_data, cidd, bbox_array, bbox_ref_list)
-            batchingFrames(device_id, finalFrameDict, dev_id_dict, frame_timestamp)
-
-        except Exception as e:
-            logger.error("An error occurred outside function createRTSPPort", exc_info=e)
-
-
-
-                    
-
-
-
-
-
-
-
 

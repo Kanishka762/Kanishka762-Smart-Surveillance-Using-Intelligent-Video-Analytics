@@ -13,7 +13,7 @@ from modules.components.load_paths import *
 from modules.deepstream.rtsp2rtsp import main
 from modules.components.structure_dev_dict import create_device_dict
 from modules.db.db_push import gif_push
-from modules.data_process.frame_data_process import frame_2_dict
+from modules.data_process.createBatch import frame_2_dict
 
 load_dotenv(dotenv_path)
 
