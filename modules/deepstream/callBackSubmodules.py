@@ -63,6 +63,8 @@ def fetch_bbox_color(detect_type):
             if detect_type in value:
                 bbox_color = key
                 break
+            else:
+                bbox_color = 'green'
         return bbox_color
     except Exception as e:
         logger.error("An error occurred while fetching bbox color", exc_info=e)
@@ -136,7 +138,7 @@ def get_object_info(obj_meta):
     except Exception as e:
         logger.error("An error occurred while getting Object Meta information", exc_info=e)
     
-def create_obj_dict(n_frame, obj_meta, obj_id, detect_type, confidence_score, left, top, width, height, frame_dict, subscriptions_class_list, frame_number):
+def create_obj_dict(n_frame, obj_meta, obj_id, detect_type, confidence_score, left, top, width, height, frame_dict, frame_number):
     try:
         n_frame_crop = crop_object(n_frame, obj_meta)
         frame_crop_copy = frame_color_convert(n_frame_crop, "RGBA2BGRA")
@@ -152,23 +154,22 @@ def create_obj_dict(n_frame, obj_meta, obj_id, detect_type, confidence_score, le
         logger.error("An error occurred while calculating age factor", exc_info=e)
     
     try:
-        if detect_type in subscriptions_class_list:
-            obj_dict =  {
-            'detect_type' : detect_type,
-            'confidence_score': confidence_score,
-            'obj_id' : obj_id,
-            'bbox_left' : left,
-            'bbox_top' : top,
-            'bbox_right' : left + width,
-            'bbox_bottom' : top + height,
-            'timestamp' :  dt.strftime("%H:%M:%S %d/%m/%Y"),
-            'crop' : frame_color_convert(frame_crop_copy, "BGR2RGB"),
-            'age' : age_dict[obj_id]
-            }
-            if detect_type in constantIdObjects:
-                obj_dict['obj_id'] = 1
-            if frame_dict is not None:
-                frame_dict['objects'].append(obj_dict)
+        obj_dict =  {
+        'detect_type' : detect_type,
+        'confidence_score': confidence_score,
+        'obj_id' : obj_id,
+        'bbox_left' : left,
+        'bbox_top' : top,
+        'bbox_right' : left + width,
+        'bbox_bottom' : top + height,
+        'timestamp' :  dt.strftime("%H:%M:%S %d/%m/%Y"),
+        'crop' : frame_color_convert(frame_crop_copy, "BGR2RGB"),
+        'age' : age_dict[obj_id]
+        }
+        if detect_type in constantIdObjects:
+            obj_dict['obj_id'] = 1
+        if frame_dict is not None:
+            frame_dict['objects'].append(obj_dict)
         return frame_dict
     except Exception as e:
         logger.error("An error occurred while creating object dictionary", exc_info=e)

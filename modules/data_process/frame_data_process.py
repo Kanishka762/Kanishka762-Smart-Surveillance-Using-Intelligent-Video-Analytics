@@ -13,7 +13,7 @@ import numpy as np
 import lmdb
 
 # from collections import deque
-
+from modules.alarm.alarm_trigger import sound_alarm
 from modules.db.db_insert import dbpush_members
 from modules.face_recognition_pack.recog_objcrop_face import FaceRecognition
 from modules.lmdbSubmodules.liveStreamLabelGen import lmdboperations

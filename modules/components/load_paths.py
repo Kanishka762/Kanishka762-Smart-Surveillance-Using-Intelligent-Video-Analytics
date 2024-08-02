@@ -15,3 +15,5 @@ ipfs_tempdata_path = join(static_path,'ipfs_data')
 gif_path = join(static_path, 'Gif_output')
 hls_path = join(static_path, 'Hls_output')  
 logs_path = join(static_path, 'logs')  
+
+device_path = join(data_path, 'device_details.txt')

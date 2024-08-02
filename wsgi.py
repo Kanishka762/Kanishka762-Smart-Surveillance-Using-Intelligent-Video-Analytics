@@ -12,7 +12,6 @@ from init import *
 from modules.components.load_paths import *
 from modules.deepstream.rtsp2rtsp import main
 from modules.components.structure_dev_dict import create_device_dict
-from modules.db.db_push import gif_push
 from modules.data_process.createBatch import frame_2_dict
 
 load_dotenv(dotenv_path)
@@ -46,11 +45,6 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error("An error occurred outside function createRTSPPort", exc_info=e)
 
-    try:
-        threading.Thread(target = gif_push).start()
-    except Exception as e:
-        logger.error("An error occurred while creating thread for gif_push", exc_info=e)
-        
     try:
         threading.Thread(target = frame_2_dict).start()
     except Exception as e:
